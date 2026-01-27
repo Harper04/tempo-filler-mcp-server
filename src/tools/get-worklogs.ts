@@ -1,11 +1,11 @@
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { format, parseISO } from "date-fns";
 import { TempoClient } from "../tempo-client.js";
 import {
   GetWorklogsInput,
-  TempoWorklog,
-  GetWorklogsResponse,
-  TempoWorklogResponse
+  TempoWorklogResponse,
+  GetWorklogsJsonResponse,
+  WorklogResponse,
+  IssueAggregateResponse
 } from "../types/index.js";
 
 /**
@@ -30,104 +30,66 @@ export async function getWorklogs(
     });
 
     // Process and format the worklogs
-    const worklogs: TempoWorklog[] = worklogResponses.map((response: TempoWorklogResponse) => ({
-      id: response.tempoWorklogId?.toString() || response.id || 'unknown',
-      issueKey: response.issue.key,
-      issueSummary: response.issue.summary,
-      timeSpentSeconds: response.timeSpentSeconds,
-      billableSeconds: response.billableSeconds,
-      started: response.started,
-      worker: response.worker,
-      attributes: response.attributes || {},
-      timeSpent: response.timeSpent,
-      comment: response.comment || ''
-    }));
+    const worklogs: WorklogResponse[] = worklogResponses.map((response: TempoWorklogResponse) => {
+      // Extract date part from datetime string (handles both "2025-09-12 00:00:00.000" and "2025-09-12T00:00:00.000")
+      const datePart = response.started.split(/[T\s]/)[0];
+
+      return {
+        id: response.tempoWorklogId?.toString() || response.id || 'unknown',
+        issueKey: response.issue.key,
+        issueSummary: response.issue.summary,
+        date: datePart,
+        hours: Math.round((response.timeSpentSeconds / 3600) * 100) / 100,
+        comment: response.comment || ''
+      };
+    });
 
     // Calculate total hours
-    const totalSeconds = worklogs.reduce((sum, worklog) => sum + worklog.timeSpentSeconds, 0);
-    const totalHours = Math.round((totalSeconds / 3600) * 100) / 100; // Round to 2 decimal places
+    const totalHours = Math.round(worklogs.reduce((sum, worklog) => sum + worklog.hours, 0) * 100) / 100;
 
-    const result: GetWorklogsResponse = {
+    // Group by issue for aggregation
+    const issueMap = new Map<string, { issueSummary: string; totalHours: number; entryCount: number }>();
+    for (const worklog of worklogs) {
+      const existing = issueMap.get(worklog.issueKey);
+      if (existing) {
+        existing.totalHours += worklog.hours;
+        existing.entryCount += 1;
+      } else {
+        issueMap.set(worklog.issueKey, {
+          issueSummary: worklog.issueSummary,
+          totalHours: worklog.hours,
+          entryCount: 1
+        });
+      }
+    }
+
+    // Build byIssue aggregation
+    const byIssue: IssueAggregateResponse[] = Array.from(issueMap.entries()).map(([key, data]) => ({
+      issueKey: key,
+      issueSummary: data.issueSummary,
+      totalHours: Math.round(data.totalHours * 100) / 100,
+      entryCount: data.entryCount
+    }));
+
+    // Return JSON response
+    const response: GetWorklogsJsonResponse = {
+      startDate,
+      endDate: actualEndDate,
+      ...(issueKey && { issueFilter: issueKey }),
       worklogs,
-      totalHours
+      byIssue,
+      summary: {
+        totalHours,
+        totalEntries: worklogs.length,
+        uniqueIssues: issueMap.size
+      }
     };
-
-    // Format response for display - CONCISE VERSION
-    let displayText = `## Your Worklogs (${startDate}`;
-    if (endDate && endDate !== startDate) {
-      displayText += ` to ${endDate}`;
-    }
-    displayText += `)\n\n`;
-
-    if (issueKey) {
-      displayText += `**Issue:** ${issueKey}\n\n`;
-    }
-
-    if (worklogs.length === 0) {
-      displayText += "No worklogs found.\n";
-    } else {
-      displayText += `**Total:** ${totalHours}h (${worklogs.length} entries)\n\n`;
-
-      // Group by issue for summary (more concise)
-      const issueGroups = worklogs.reduce((acc, worklog) => {
-        if (!acc[worklog.issueKey]) {
-          acc[worklog.issueKey] = {
-            totalSeconds: 0,
-            entries: 0
-          };
-        }
-        acc[worklog.issueKey].totalSeconds += worklog.timeSpentSeconds;
-        acc[worklog.issueKey].entries += 1;
-        return acc;
-      }, {} as Record<string, { totalSeconds: number; entries: number }>);
-
-      // Show summary by issue with issue summary
-      for (const [key, data] of Object.entries(issueGroups)) {
-        const hours = (data.totalSeconds / 3600).toFixed(1);
-        // Get issue summary from first worklog with this key
-        const sampleWorklog = worklogs.find(w => w.issueKey === key);
-        const issueSummary = sampleWorklog?.issueSummary || '';
-        displayText += `• **${key}** (${issueSummary}): ${hours}h (${data.entries} entries)\n`;
-      }
-
-      // Show recent entries (limit to 100 most recent)
-      const recentWorklogs = worklogs
-        .sort((a, b) => b.started.localeCompare(a.started))
-        .slice(0, 100);
-
-      if (recentWorklogs.length > 0) {
-        displayText += `\n**Recent Entries:**\n`;
-        for (const worklog of recentWorklogs) {
-          // Extract date part from datetime string (handles both "2025-09-12 00:00:00.000" and "2025-09-12T00:00:00.000")
-          const datePart = worklog.started.split(/[T\s]/)[0];
-
-          // Parse and format the human-readable date
-          const parsedDate = parseISO(datePart);
-          const humanReadableDate = format(parsedDate, "EEEE, MMMM do, yyyy");
-
-          // Create hybrid format: ISO date + human-readable in parentheses
-          const formattedDate = `${datePart} (${humanReadableDate})`;
-
-          const hours = (worklog.timeSpentSeconds / 3600).toFixed(1);
-          let entryText = `• ${formattedDate}: **${worklog.issueKey}** (${worklog.issueSummary}) - ${hours}h - [ID: ${worklog.id}]`;
-          if (worklog.comment && worklog.comment.trim()) {
-            entryText += ` - "${worklog.comment}"`;
-          }
-          displayText += `${entryText}\n`;
-        }
-      }
-
-      if (worklogs.length > 100) {
-        displayText += `\n*Showing 100 most recent of ${worklogs.length} total entries*\n`;
-        displayText += `*💡 Tip: Use a shorter date range or specific issueKey filter for more targeted results*\n`;
-      }
-    }
 
     return {
       content: [
         {
           type: "text",
-          text: displayText
+          text: JSON.stringify(response)
         }
       ],
       isError: false

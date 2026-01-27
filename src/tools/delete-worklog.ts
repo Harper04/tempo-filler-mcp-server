@@ -1,6 +1,6 @@
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { TempoClient } from "../tempo-client.js";
-import { DeleteWorklogInput } from "../types/index.js";
+import { DeleteWorklogInput, DeleteWorklogJsonResponse } from "../types/index.js";
 
 /**
  * Delete worklog tool implementation
@@ -28,19 +28,17 @@ export async function deleteWorklog(
     // Attempt to delete the worklog
     await tempoClient.deleteWorklog(worklogId);
 
-    // Format success response
-    let displayText = `## Worklog Deleted Successfully\n\n`;
-    displayText += `The worklog has been permanently removed from Tempo.\n\n`;
-    displayText += `**Details:**\n`;
-    displayText += `- ${worklogDetails}\n`;
-    displayText += `- Deleted at: ${new Date().toISOString()}\n\n`;
-    displayText += `⚠️ **Note:** This action cannot be undone. The worklog and all associated time entries have been permanently removed from your timesheet.\n`;
+    // Return JSON response
+    const response: DeleteWorklogJsonResponse = {
+      success: true,
+      deletedWorklogId: worklogId
+    };
 
     return {
       content: [
         {
           type: "text",
-          text: displayText
+          text: JSON.stringify(response)
         }
       ],
       isError: false

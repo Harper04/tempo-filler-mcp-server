@@ -3,9 +3,9 @@ import { format, parseISO } from "date-fns";
 import { TempoClient } from "../tempo-client.js";
 import {
   GetScheduleInput,
-  GetScheduleResponse,
-  ScheduleDay,
-  TempoScheduleResponse
+  TempoScheduleResponse,
+  GetScheduleJsonResponse,
+  ScheduleDayResponse
 } from "../types/index.js";
 
 /**
@@ -46,21 +46,15 @@ export async function getSchedule(
     const { schedule } = scheduleResponse;
 
     // Process and format the schedule days
-    const scheduleDays: ScheduleDay[] = schedule.days.map((day) => {
-      // Extract date part and parse it
-      const datePart = day.date;
-      const parsedDate = parseISO(datePart);
-      const humanReadableDate = format(parsedDate, "EEEE, MMMM do, yyyy");
-
-      // Create hybrid format: ISO date + human-readable in parentheses
-      const formattedDate = `${datePart} (${humanReadableDate})`;
+    const scheduleDays: ScheduleDayResponse[] = schedule.days.map((day) => {
+      const parsedDate = parseISO(day.date);
+      const dayOfWeek = format(parsedDate, "EEEE");
 
       return {
         date: day.date,
-        formattedDate,
+        dayOfWeek,
         requiredHours: Math.round((day.requiredSeconds / 3600) * 100) / 100, // Round to 2 decimal places
-        isWorkingDay: day.type === "WORKING_DAY",
-        type: day.type === "WORKING_DAY" ? "Working Day" : "Non-Working Day"
+        isWorkingDay: day.type === "WORKING_DAY"
       };
     });
 
@@ -71,7 +65,10 @@ export async function getSchedule(
     const totalRequiredHours = Math.round((schedule.requiredSeconds / 3600) * 100) / 100;
     const averageDailyHours = workingDays > 0 ? Math.round((totalRequiredHours / workingDays) * 100) / 100 : 0;
 
-    const result: GetScheduleResponse = {
+    // Return JSON response
+    const response: GetScheduleJsonResponse = {
+      startDate,
+      endDate: actualEndDate,
       days: scheduleDays,
       summary: {
         totalDays,
@@ -82,64 +79,11 @@ export async function getSchedule(
       }
     };
 
-    // Format response for display
-    let displayText = `## Work Schedule (${startDate}`;
-    if (endDate && endDate !== startDate) {
-      displayText += ` to ${endDate}`;
-    }
-    displayText += `)\n\n`;
-
-    // Period Summary
-    displayText += `**Period Summary:**\n`;
-    displayText += `- Total Days: ${result.summary.totalDays}\n`;
-    displayText += `- Working Days: ${result.summary.workingDays}\n`;
-    displayText += `- Non-Working Days: ${result.summary.nonWorkingDays}\n`;
-    displayText += `- Total Required Hours: ${result.summary.totalRequiredHours}h\n`;
-    if (result.summary.workingDays > 0) {
-      displayText += `- Average Daily Hours: ${result.summary.averageDailyHours}h\n`;
-    }
-    displayText += `\n`;
-
-    // Schedule Details
-    if (scheduleDays.length > 0) {
-      displayText += `**Schedule Details:**\n`;
-
-      // Show all days (limit to reasonable amount for display)
-      const displayLimit = 100; // Reasonable limit for display
-      const daysToShow = scheduleDays.slice(0, displayLimit);
-
-      for (const day of daysToShow) {
-        if (day.isWorkingDay) {
-          displayText += `• ${day.formattedDate}: ${day.requiredHours}h (${day.type})\n`;
-        } else {
-          displayText += `• ${day.formattedDate}: - (${day.type})\n`;
-        }
-      }
-
-      if (scheduleDays.length > displayLimit) {
-        displayText += `\n*Showing first ${displayLimit} of ${scheduleDays.length} total days*\n`;
-        displayText += `*💡 Tip: Use a shorter date range for more detailed display*\n`;
-      }
-    }
-
-    // Add helpful information for integration with other tools
-    if (result.summary.workingDays > 0) {
-      displayText += `\n**💡 Next Steps - Schedule-Aware Time Logging:**\n`;
-      displayText += `- **Single Entry**: Use this schedule to verify working days before post_worklog\n`;
-      displayText += `- **Bulk Entry**: Create bulk worklogs only for the ${result.summary.workingDays} working days shown above\n`;
-      displayText += `- **Smart Planning**: Total capacity is ${result.summary.totalRequiredHours}h across ${result.summary.workingDays} working days\n`;
-      displayText += `- **Avoid Errors**: Non-working days (${result.summary.nonWorkingDays} days) should not have time entries\n`;
-
-      if (result.summary.totalRequiredHours > 0) {
-        displayText += `\n**Example Bulk Entry**: "Fill all working days shown above with 8 hours on PROJ-1234"\n`;
-      }
-    }
-
     return {
       content: [
         {
           type: "text",
-          text: displayText
+          text: JSON.stringify(response)
         }
       ],
       isError: false

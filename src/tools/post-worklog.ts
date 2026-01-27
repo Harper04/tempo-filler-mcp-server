@@ -1,6 +1,6 @@
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { TempoClient } from "../tempo-client.js";
-import { PostWorklogInput } from "../types/index.js";
+import { PostWorklogInput, PostWorklogJsonResponse } from "../types/index.js";
 
 /**
  * Post worklog tool implementation
@@ -37,41 +37,24 @@ export async function postWorklog(
     // Handle the response - API returns an array with a single worklog object
     const worklog = Array.isArray(worklogResponse) ? worklogResponse[0] : worklogResponse;
 
-    // Format success response
-    const actualEndDate = endDate || startDate;
-    const billableHours = billable ? hours : 0;
-    
-    let displayText = `## Worklog Created Successfully\n\n`;
-    displayText += `**Issue:** ${issueKey} - ${worklog.issue.summary}\n`;
-    displayText += `**Hours:** ${hours}h`;
-    if (billableHours !== hours) {
-      displayText += ` (${billableHours}h billable)`;
-    }
-    displayText += `\n`;
-    displayText += `**Date:** ${startDate}`;
-    if (actualEndDate !== startDate) {
-      displayText += ` to ${actualEndDate}`;
-    }
-    displayText += `\n`;
-    
-    if (description) {
-      displayText += `**Description:** ${description}\n`;
-    }
-    
-    displayText += `**Worklog ID:** ${worklog.tempoWorklogId || worklog.id}\n`;
-    displayText += `**Time Spent:** ${worklog.timeSpent}\n`;
-    
-    // Add some helpful information
-    displayText += `\n### Details\n`;
-    displayText += `- Created at: ${new Date().toISOString()}\n`;
-    displayText += `- Total seconds: ${worklog.timeSpentSeconds}\n`;
-    displayText += `- Billable seconds: ${worklog.billableSeconds}\n`;
-    
+    // Return JSON response
+    const response: PostWorklogJsonResponse = {
+      success: true,
+      worklog: {
+        id: String(worklog.tempoWorklogId || worklog.id),
+        issueKey,
+        issueSummary: worklog.issue.summary,
+        date: startDate,
+        hours,
+        comment: description || ''
+      }
+    };
+
     return {
       content: [
         {
           type: "text",
-          text: displayText
+          text: JSON.stringify(response)
         }
       ],
       isError: false
