@@ -1,0 +1,276 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--color-text-primary, #333);
+  background: transparent;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  body {
+    color: var(--color-text-primary, #e0e0e0);
+  }
+}
+
+#app {
+  padding: 8px;
+  /* Add extra bottom padding to account for horizontal scrollbar height
+     which is not included in the SDK's auto-resize measurement */
+  padding-bottom: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-primary, #e0e0e0);
+}
+
+#date-range {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--color-text-primary, inherit);
+}
+
+#zoom-toggle {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-primary, #ccc);
+  border-radius: var(--border-radius-md, 4px);
+  background: var(--color-background-primary, white);
+  color: var(--color-text-primary, #333);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#zoom-toggle:hover {
+  border-color: var(--color-border-secondary, #999);
+}
+
+#grid-container {
+  overflow: auto;
+  max-width: 100%;
+  max-height: 400px;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 3px;
+  font-size: 13px;
+  min-width: 100%;
+}
+
+th, td {
+  padding: 8px 10px;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--color-text-primary, inherit);
+  border-radius: 6px;
+  background: var(--color-background-secondary, #f5f5f5);
+}
+
+th {
+  background: var(--color-background-tertiary, #e8e8e8);
+  font-weight: 600;
+  font-size: 11px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Sticky columns */
+.sticky-issue {
+  position: sticky;
+  left: 0;
+  background: var(--color-background-primary, white) !important;
+  z-index: 2;
+  text-align: left;
+  min-width: 180px;
+  max-width: 180px;
+  border-radius: 6px 0 0 6px;
+}
+
+.sticky-logged {
+  position: sticky;
+  left: 183px;
+  background: var(--color-background-secondary, #f0f0f0) !important;
+  z-index: 2;
+  min-width: 70px;
+  font-weight: 500;
+}
+
+th.sticky-issue {
+  background: var(--color-background-tertiary, #e8e8e8) !important;
+  z-index: 3;
+}
+
+th.sticky-logged {
+  background: var(--color-background-tertiary, #e8e8e8);
+  z-index: 3;
+}
+
+/* Allow coverage colors to show on sticky-logged header */
+th.sticky-logged.coverage-full,
+th.sticky-logged.coverage-under,
+th.sticky-logged.coverage-gap,
+th.sticky-logged.coverage-over {
+  color: white !important;
+}
+
+/* Issue cell two-line format */
+.issue-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.issue-summary {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  color: var(--color-text-primary, inherit);
+}
+
+.issue-key {
+  font-size: 11px;
+  color: var(--color-text-secondary, #666);
+}
+
+/* Non-working day columns */
+.non-working-col {
+  background: var(--color-background-tertiary, #fafafa) !important;
+  color: var(--color-text-tertiary, #999) !important;
+}
+
+/* Coverage colors - vibrant scheme */
+.coverage-full {
+  background: rgba(34, 197, 94, 0.75) !important;
+  color: white !important;
+  font-weight: 500;
+}
+
+.coverage-under {
+  background: rgba(245, 158, 11, 0.75) !important;
+  color: white !important;
+  font-weight: 500;
+}
+
+.coverage-gap {
+  background: rgba(249, 115, 22, 0.75) !important;
+  color: white !important;
+  font-weight: 500;
+}
+
+.coverage-over {
+  background: rgba(59, 130, 246, 0.75) !important;
+  color: white !important;
+  font-weight: 500;
+}
+
+.coverage-non-working {
+  background: var(--color-background-tertiary, #f5f5f5) !important;
+  color: var(--color-text-tertiary, #999) !important;
+}
+
+/* Row styling */
+tbody tr:hover td {
+  filter: brightness(0.95);
+}
+
+tbody tr:hover td.sticky-issue {
+  background: var(--color-background-secondary, #f0f0f0) !important;
+}
+
+/* Total row */
+.total-row td {
+  font-weight: 600;
+  background: var(--color-background-tertiary, #e0e0e0);
+}
+
+.total-row td.sticky-issue {
+  background: var(--color-background-secondary, #eaeaea) !important;
+}
+
+/* Ensure coverage colors show on total row */
+.total-row td.coverage-full,
+.total-row td.coverage-under,
+.total-row td.coverage-gap,
+.total-row td.coverage-over {
+  color: white !important;
+}
+
+.total-row td.sticky-issue,
+.total-row td.sticky-logged {
+  background: var(--color-background-secondary, #fafafa);
+}
+
+/* Empty state */
+.empty-state {
+  padding: 32px;
+  text-align: center;
+  color: var(--color-text-secondary, #666);
+  font-size: 14px;
+}
+
+/* Day header with weekday */
+.day-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.day-month {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-primary, inherit);
+}
+
+.day-num {
+  font-weight: 500;
+  color: var(--color-text-primary, inherit);
+}
+
+.day-name {
+  font-size: 10px;
+  color: var(--color-text-secondary, #888);
+  font-weight: normal;
+}
+
+/* Ensure day header text is white when parent has coverage color */
+.coverage-full .day-month,
+.coverage-full .day-num,
+.coverage-full .day-name,
+.coverage-under .day-month,
+.coverage-under .day-num,
+.coverage-under .day-name,
+.coverage-gap .day-month,
+.coverage-gap .day-num,
+.coverage-gap .day-name,
+.coverage-over .day-month,
+.coverage-over .day-num,
+.coverage-over .day-name {
+  color: white !important;
+}
+
+/* Footer */
+.grid-footer {
+  margin-top: 12px;
+  padding-top: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #666);
+  text-align: right;
+}

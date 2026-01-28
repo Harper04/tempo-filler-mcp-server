@@ -115,3 +115,16 @@ test-results.xml
 # Local configuration files
 config.local.json
 settings.local.json
+
+# Playwright MCP screenshots
+.playwright-mcp/
+
+# Local bundle configs (contain machine-specific paths)
+bundle-local/
+bundle/manifest.local.json
+
+# Test scripts
+test-mcp-app.js
+
+# Windows artifacts
+nul

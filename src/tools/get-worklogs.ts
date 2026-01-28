@@ -1,11 +1,14 @@
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { format, parseISO } from "date-fns";
 import { TempoClient } from "../tempo-client.js";
 import {
   GetWorklogsInput,
   TempoWorklogResponse,
+  TempoScheduleResponse,
   GetWorklogsJsonResponse,
   WorklogResponse,
-  IssueAggregateResponse
+  IssueAggregateResponse,
+  ScheduleDayResponse
 } from "../types/index.js";
 
 /**
@@ -14,7 +17,8 @@ import {
  */
 export async function getWorklogs(
   tempoClient: TempoClient,
-  input: GetWorklogsInput
+  input: GetWorklogsInput,
+  uiHtml?: string
 ): Promise<CallToolResult> {
   try {
     const { startDate, endDate, issueKey } = input;
@@ -71,6 +75,32 @@ export async function getWorklogs(
       entryCount: data.entryCount
     }));
 
+    // Fetch schedule data for coverage-aware UI coloring
+    let scheduleDays: ScheduleDayResponse[] = [];
+    try {
+      const scheduleResponses = await tempoClient.getSchedule({
+        startDate,
+        endDate: actualEndDate
+      });
+
+      if (scheduleResponses && scheduleResponses.length > 0) {
+        const scheduleResponse: TempoScheduleResponse = scheduleResponses[0];
+        scheduleDays = scheduleResponse.schedule.days.map((day) => {
+          const parsedDate = parseISO(day.date);
+          const dayOfWeek = format(parsedDate, "EEEE");
+          return {
+            date: day.date,
+            dayOfWeek,
+            requiredHours: Math.round((day.requiredSeconds / 3600) * 100) / 100,
+            isWorkingDay: day.type === "WORKING_DAY"
+          };
+        });
+      }
+    } catch {
+      // Schedule fetch failed - continue without schedule data
+      // UI will handle missing schedule gracefully
+    }
+
     // Return JSON response
     const response: GetWorklogsJsonResponse = {
       startDate,
@@ -82,7 +112,8 @@ export async function getWorklogs(
         totalHours,
         totalEntries: worklogs.length,
         uniqueIssues: issueMap.size
-      }
+      },
+      schedule: scheduleDays
     };
 
     return {
@@ -92,6 +123,7 @@ export async function getWorklogs(
           text: JSON.stringify(response)
         }
       ],
+      structuredContent: response as unknown as Record<string, unknown>,
       isError: false
     };
 

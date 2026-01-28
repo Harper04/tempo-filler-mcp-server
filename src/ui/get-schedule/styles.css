@@ -1,0 +1,152 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--color-text-primary, #333);
+  background: transparent;
+}
+
+/* Dark mode fallback */
+@media (prefers-color-scheme: dark) {
+  body {
+    color: var(--color-text-primary, #e0e0e0);
+  }
+}
+
+#app {
+  padding: 8px;
+}
+
+.month-container {
+  margin-bottom: 16px;
+}
+
+.month-container:last-child {
+  margin-bottom: 0;
+}
+
+.month-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--color-border-primary, #e0e0e0);
+}
+
+.month-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--color-text-primary, inherit);
+}
+
+.month-hours {
+  font-size: 13px;
+  color: var(--color-text-secondary, #666);
+}
+
+.weekday-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.weekday-label {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #666);
+  padding: 4px 0;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.day-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  border-radius: var(--border-radius-sm, 6px);
+  padding: 6px 4px;
+  min-height: 44px;
+  gap: 2px;
+}
+
+.day-num {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.day-hours {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.day-cell.empty {
+  background: transparent;
+}
+
+.day-cell.working {
+  background: rgba(34, 197, 94, 0.85);
+  color: white;
+  font-weight: 500;
+}
+
+.day-cell.non-working {
+  background: var(--color-background-tertiary, rgba(128, 128, 128, 0.1));
+  color: var(--color-text-tertiary, #9e9e9e);
+}
+
+.day-cell.today {
+  border: 2px solid #16a34a;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-primary, #e0e0e0);
+  font-size: 12px;
+  color: var(--color-text-secondary, #666);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.legend-swatch.working {
+  background: rgba(34, 197, 94, 0.85);
+}
+
+.legend-swatch.non-working {
+  background: var(--color-background-tertiary, rgba(128, 128, 128, 0.1));
+}
+
+.summary {
+  font-size: 12px;
+  color: var(--color-text-secondary, #666);
+  margin-top: 8px;
+}

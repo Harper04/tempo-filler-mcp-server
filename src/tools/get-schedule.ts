@@ -15,7 +15,8 @@ import {
  */
 export async function getSchedule(
   tempoClient: TempoClient,
-  input: GetScheduleInput
+  input: GetScheduleInput,
+  uiHtml?: string
 ): Promise<CallToolResult> {
   try {
     const { startDate, endDate } = input;
@@ -86,6 +87,7 @@ export async function getSchedule(
           text: JSON.stringify(response)
         }
       ],
+      structuredContent: response as unknown as Record<string, unknown>,
       isError: false
     };
 

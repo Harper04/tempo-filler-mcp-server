@@ -60,6 +60,7 @@ export interface GetWorklogsJsonResponse {
   worklogs: WorklogResponse[];
   byIssue: IssueAggregateResponse[];
   summary: WorklogSummaryResponse;
+  schedule: ScheduleDayResponse[];  // For coverage-aware UI coloring
 }
 
 // ============================================================================

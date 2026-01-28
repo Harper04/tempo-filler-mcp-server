@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -12,6 +15,25 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { TempoClient } from "./tempo-client.js";
+
+// Load UI HTML files at module initialization
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+let getScheduleUI: string = "";
+let getWorklogsUI: string = "";
+
+try {
+  getScheduleUI = readFileSync(join(__dirname, "ui/get-schedule.html"), "utf-8");
+} catch {
+  console.error("Warning: get-schedule UI not found - UI features will be unavailable");
+}
+
+try {
+  getWorklogsUI = readFileSync(join(__dirname, "ui/get-worklogs.html"), "utf-8");
+} catch {
+  console.error("Warning: get-worklogs UI not found - UI features will be unavailable");
+}
 import { getWorklogs, postWorklog, bulkPostWorklogs, deleteWorklog, getSchedule } from "./tools/index.js";
 import {
   GetWorklogsInputSchema,
@@ -65,6 +87,21 @@ const server = new Server(
   }
 );
 
+// Debug: Log client capabilities when connection is established
+server.oninitialized = () => {
+  console.error("=== MCP Server Initialized ===");
+  const caps = server.getClientCapabilities();
+  console.error("Client Capabilities:", JSON.stringify(caps, null, 2));
+  // Check for MCP Apps extension support (may be in experimental or a different field)
+  const capsAny = caps as Record<string, unknown>;
+  if (capsAny?.["io.modelcontextprotocol/ui"] || capsAny?.extensions) {
+    console.error("✓ Client may support MCP Apps");
+    console.error("Extensions field:", JSON.stringify(capsAny?.extensions, null, 2));
+  } else {
+    console.error("✗ No MCP Apps extension detected in capabilities");
+  }
+};
+
 // Tool definitions and handlers
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
@@ -92,6 +129,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["startDate"],
         },
+        _meta: getWorklogsUI ? {
+          ui: { resourceUri: "ui://tempofiller/get-worklogs.html" },
+        } : undefined,
       },
       {
         name: TOOL_NAMES.POST_WORKLOG,
@@ -207,6 +247,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["startDate"],
         },
+        _meta: getScheduleUI ? {
+          ui: { resourceUri: "ui://tempofiller/get-schedule.html" },
+        } : undefined,
       },
     ],
   };
@@ -220,7 +263,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case TOOL_NAMES.GET_WORKLOGS: {
         const input = GetWorklogsInputSchema.parse(args);
-        return await getWorklogs(tempoClient, input);
+        return await getWorklogs(tempoClient, input, getWorklogsUI || undefined);
       }
 
       case TOOL_NAMES.POST_WORKLOG: {
@@ -240,7 +283,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case TOOL_NAMES.GET_SCHEDULE: {
         const input = GetScheduleInputSchema.parse(args);
-        return await getSchedule(tempoClient, input);
+        return await getSchedule(tempoClient, input, getScheduleUI || undefined);
       }
 
       default:
@@ -262,20 +305,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Resource handlers (basic implementation)
 server.setRequestHandler(ListResourcesRequestSchema, async () => {
-  return {
-    resources: [
-      {
-        uri: "tempo://issues/recent",
-        name: "Recent Issues",
-        description: "Recently used issue keys for quick reference",
-        mimeType: "application/json",
-      },
-    ],
-  };
+  const resources = [
+    {
+      uri: "tempo://issues/recent",
+      name: "Recent Issues",
+      description: "Recently used issue keys for quick reference",
+      mimeType: "application/json",
+    },
+  ];
+
+  // Add UI resources if available (MCP Apps extension)
+  if (getScheduleUI) {
+    resources.push({
+      uri: "ui://tempofiller/get-schedule.html",
+      name: "Schedule Calendar UI",
+      description: "Visual calendar view for get_schedule tool results",
+      mimeType: "text/html;profile=mcp-app",
+    });
+  }
+
+  if (getWorklogsUI) {
+    resources.push({
+      uri: "ui://tempofiller/get-worklogs.html",
+      name: "Worklogs Timesheet UI",
+      description: "Visual timesheet grid for get_worklogs tool results",
+      mimeType: "text/html;profile=mcp-app",
+    });
+  }
+
+  return { resources };
 });
 
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
+
+  // Debug: Log all resource read requests
+  console.error(`[DEBUG] Resource read request: ${uri}`);
 
   if (uri === "tempo://issues/recent") {
     // For now, return a simple placeholder
@@ -291,6 +356,33 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
           uri,
           mimeType: "application/json",
           text: JSON.stringify(recentIssues, null, 2),
+        },
+      ],
+    };
+  }
+
+  // Handle UI resources - MCP Apps extension uses text/html;profile=mcp-app MIME type
+  if (uri === "ui://tempofiller/get-schedule.html" && getScheduleUI) {
+    console.error(`[DEBUG] Returning get-schedule UI (${getScheduleUI.length} bytes)`);
+    return {
+      contents: [
+        {
+          uri,
+          mimeType: "text/html;profile=mcp-app",
+          text: getScheduleUI,
+        },
+      ],
+    };
+  }
+
+  if (uri === "ui://tempofiller/get-worklogs.html" && getWorklogsUI) {
+    console.error(`[DEBUG] Returning get-worklogs UI (${getWorklogsUI.length} bytes)`);
+    return {
+      contents: [
+        {
+          uri,
+          mimeType: "text/html;profile=mcp-app",
+          text: getWorklogsUI,
         },
       ],
     };

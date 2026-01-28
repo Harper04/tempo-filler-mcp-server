@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Test MCP App</title>
+  <script type="module">
+    import { App } from "https://esm.sh/@modelcontextprotocol/ext-apps@1.0.0";
+
+    const app = new App();
+
+    app.ontoolresult = (result) => {
+      document.getElementById("output").textContent = "Got result: " + JSON.stringify(result).substring(0, 200);
+    };
+
+    document.getElementById("status").textContent = "Connecting...";
+
+    app.connect().then(() => {
+      document.getElementById("status").textContent = "Connected! Waiting for tool result...";
+    }).catch(err => {
+      document.getElementById("status").textContent = "Error: " + err.message;
+    });
+  </script>
+  <style>
+    body { font-family: system-ui; padding: 20px; background: #f5f5f5; }
+    #status { color: blue; margin-bottom: 10px; }
+    #output { background: white; padding: 10px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h2>MCP App Test</h2>
+  <div id="status">Loading...</div>
+  <div id="output">No data yet</div>
+</body>
+</html>
