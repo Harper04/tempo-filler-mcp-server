@@ -54,7 +54,7 @@
   "homepage": "https://github.com/TRANZACT/tempo-filler-mcp-server#readme",
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.0.0",
-    "@modelcontextprotocol/sdk": "^1.17.1",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "@types/cors": "^2.8.19",
     "axios": "^1.6.0",
     "cors": "^2.8.6",
