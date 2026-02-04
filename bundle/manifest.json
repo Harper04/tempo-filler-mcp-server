@@ -11,10 +11,8 @@
     "type": "node",
     "entry_point": "server/index.js",
     "mcp_config": {
-      "command": "npx",
-      "args": [
-        "@tranzact/tempo-filler-mcp-server"
-      ],
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
       "env": {
         "TEMPO_BASE_URL": "${user_config.tempo_base_url}",
         "TEMPO_PAT": "${user_config.tempo_pat}",
@@ -44,6 +42,20 @@
       "default": 8
     }
   },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "tools": [
+    { "name": "get_worklogs", "description": "Retrieve worklogs for authenticated user and date range" },
+    { "name": "post_worklog", "description": "Create a new worklog entry" },
+    { "name": "bulk_post_worklogs", "description": "Create multiple worklog entries" },
+    { "name": "delete_worklog", "description": "Delete an existing worklog entry" },
+    { "name": "get_schedule", "description": "Retrieve work schedule for authenticated user" }
+  ],
   "license": "ISC",
   "repository": {
     "type": "git",

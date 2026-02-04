@@ -123,6 +123,14 @@ settings.local.json
 bundle-local/
 bundle/manifest.local.json
 
+# MCPB build artifacts
+bundle/server/
+bundle/node_modules/
+bundle/package.json
+bundle/package-lock.json
+*.mcpb
+*.dxt
+
 # Test scripts
 test-mcp-app.js
 

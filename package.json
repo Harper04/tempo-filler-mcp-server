@@ -5,8 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "build:ui": "vite build -- --ui=get-schedule && vite build -- --ui=get-worklogs",
-    "build": "tsc && npm run build:ui && npx @anthropic-ai/mcpb pack bundle dist/tempo-filler-mcp-server.mcpb",
-    "build:unix": "tsc && npm run build:ui && chmod +x dist/index.js && npx @anthropic-ai/mcpb pack bundle dist/tempo-filler-mcp-server.mcpb",
+    "build": "tsc && npm run build:ui",
+    "build:mcpb": "node scripts/build-mcpb.js",
+    "build:all": "npm run build && npm run build:mcpb",
     "dev": "tsc && node dist/index.js",
     "dev:http": "tsc && node dist/http-server.js",
     "typecheck": "tsc --noEmit",

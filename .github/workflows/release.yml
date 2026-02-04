@@ -38,18 +38,24 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Package MCP bundle
-        run: |
-          npx @anthropic-ai/mcpb pack bundle
-          mv bundle.mcpb bundle.dxt
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build MCPB bundle
+        run: node scripts/build-mcpb.js
 
       - name: Verify bundle exists
         run: |
-          if [ ! -f "bundle.dxt" ]; then
-            echo "Error: bundle.dxt not found after running mcpb pack"
+          BUNDLE_FILE="tempo-filler-mcp-server-${{ steps.version.outputs.VERSION }}.dxt"
+          if [ ! -f "$BUNDLE_FILE" ]; then
+            echo "Error: $BUNDLE_FILE not found"
+            ls -la *.dxt 2>/dev/null || echo "No .dxt files found"
             exit 1
           fi
-          echo "Bundle created successfully: $(ls -lh bundle.dxt)"
+          echo "Bundle created: $(ls -lh $BUNDLE_FILE)"
+          echo "Bundle contents:"
+          unzip -l "$BUNDLE_FILE" | head -50
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -59,7 +65,7 @@ jobs:
 
           # Attach the MCP bundle as a downloadable asset
           files: |
-            bundle.dxt
+            tempo-filler-mcp-server-${{ steps.version.outputs.VERSION }}.dxt
 
           # Release configuration
           draft: false
@@ -75,7 +81,7 @@ jobs:
             ```
 
             ### Claude Desktop
-            Download the `bundle.dxt` file below and drag it to Claude Desktop settings → extensions to install.
+            Download the `.dxt` file below and drag it to Claude Desktop settings → Extensions to install.
 
             ### Manual Configuration
             Add to your MCP client configuration:
