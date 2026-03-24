@@ -173,6 +173,7 @@ export interface TempoClientConfig {
 export interface IssueCache {
   [issueKey: string]: {
     id: string;
+    key: string;    // actual Jira issue key (e.g. PROJ-123)
     summary: string;
     cached: Date;
   };

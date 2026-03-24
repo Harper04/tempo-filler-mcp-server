@@ -137,7 +137,7 @@ export class TempoClient {
     if (cached && (Date.now() - cached.cached.getTime()) < 300000) {
       return {
         id: cached.id,
-        key: issueKey,
+        key: cached.key,
         fields: {
           summary: cached.summary
         }
@@ -151,12 +151,17 @@ export class TempoClient {
 
       const issue = response.data;
 
-      // Cache the result
-      this.issueCache[issueKey] = {
+      // Cache the result — index by both the lookup param and the canonical key
+      const cacheEntry = {
         id: issue.id,
+        key: issue.key,
         summary: issue.fields.summary,
         cached: new Date()
       };
+      this.issueCache[issueKey] = cacheEntry;
+      if (issue.key !== issueKey) {
+        this.issueCache[issue.key] = cacheEntry;
+      }
 
       return issue;
     } catch (error) {
@@ -242,10 +247,41 @@ export class TempoClient {
 
         const response = await this.axiosInstance.get('/4/worklogs', { params: queryParams });
 
-        console.error(`📊 TEMPO CLOUD RESPONSE: Received ${response.data?.results?.length || 0} results`);
+        const rawResults: any[] = response.data?.results || [];
+        console.error(`📊 TEMPO CLOUD RESPONSE: Received ${rawResults.length} results`);
 
-        const results = response.data?.results || [];
-        return results;
+        // Batch-resolve issue key + summary for unique issue IDs (cloud worklogs only have numeric id)
+        const uniqueIssueIds = [...new Set(rawResults.map((w: any) => String(w.issue?.id)).filter(Boolean))];
+        const issueDetails = new Map<string, { key: string; summary: string }>();
+        await Promise.all(uniqueIssueIds.map(async (issueId) => {
+          try {
+            const issue = await this.getIssueById(issueId);
+            issueDetails.set(issueId, { key: issue.key, summary: issue.fields.summary });
+          } catch {
+            issueDetails.set(issueId, { key: issueId, summary: '' });
+          }
+        }));
+
+        // Normalize cloud shape to match TempoWorklogResponse expected by the tools
+        return rawResults.map((w: any) => {
+          const detail = issueDetails.get(String(w.issue?.id));
+          return {
+            id: w.tempoWorklogId?.toString(),
+            tempoWorklogId: w.tempoWorklogId,
+            billableSeconds: w.billableSeconds,
+            timeSpentSeconds: w.timeSpentSeconds,
+            timeSpent: `${Math.round(w.timeSpentSeconds / 3600 * 100) / 100}h`,
+            comment: w.description,
+            started: w.startDate,  // cloud uses startDate; tools expect started
+            issue: {
+              id: w.issue?.id,
+              key: detail?.key || String(w.issue?.id || ''),
+              summary: detail?.summary || '',
+            },
+            worker: w.author?.accountId || '',
+            attributes: {},
+          };
+        });
       } else {
         // Legacy: POST /rest/tempo-timesheets/4/worklogs/search
         const searchParams: any = {
