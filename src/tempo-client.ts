@@ -297,6 +297,7 @@ export class TempoClient {
         console.error(`🔍 TEMPO CLOUD SEARCH: Sending GET /4/worklogs with:`, JSON.stringify(queryParams));
 
         // Paginate: Tempo Cloud defaults to 50/page; fetch all pages up to 1000 each
+        // Note: metadata.count = items in current page (NOT total). Use metadata.next to detect more pages.
         let rawResults: any[] = [];
         let offset = 0;
         const pageLimit = 1000;
@@ -308,7 +309,8 @@ export class TempoClient {
           rawResults = rawResults.concat(page);
           const meta = response.data?.metadata;
           const reachedMax = params.maxResults && rawResults.length >= params.maxResults;
-          if (!meta || rawResults.length >= meta.count || page.length < pageLimit || reachedMax) break;
+          const hasMore = meta?.next;  // next URL present = more pages
+          if (!hasMore || page.length === 0 || reachedMax) break;
           offset += pageLimit;
         }
         if (params.maxResults) rawResults = rawResults.slice(0, params.maxResults);
