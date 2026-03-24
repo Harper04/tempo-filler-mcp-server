@@ -12,23 +12,24 @@ export async function postWorklog(
   input: PostWorklogInput
 ): Promise<CallToolResult> {
   try {
-    const { 
-      issueKey, 
-      hours, 
-      startDate, 
-      endDate, 
-      billable = true, 
-      description 
+    const {
+      issueKey,
+      hours,
+      startDate,
+      endDate,
+      billable = true,
+      description,
+      worker
     } = input;
 
-    // Create the worklog payload using the Tempo client (automatically uses authenticated user)
     const payload = await tempoClient.createWorklogPayload({
       issueKey,
       hours,
       startDate,
       endDate,
       billable,
-      description
+      description,
+      worker
     });
 
     // Create the worklog

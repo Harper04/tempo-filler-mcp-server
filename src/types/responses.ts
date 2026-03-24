@@ -38,6 +38,9 @@ export interface WorklogResponse {
   date: string;                // "2026-01-02" (ISO 8601)
   hours: number;               // decimal
   comment: string;
+  worker: string;              // accountId (cloud) or username (legacy)
+  workerDisplayName: string;   // human-readable name
+  workerEmail: string;         // email address (empty string if unavailable)
 }
 
 export interface IssueAggregateResponse {
@@ -57,6 +60,9 @@ export interface GetWorklogsJsonResponse {
   startDate: string;
   endDate: string;
   issueFilter?: string;        // If filtered by issue
+  projectFilter?: string;      // If filtered by project key
+  workerFilter?: string;       // If filtered by specific worker
+  allUsers?: boolean;          // If all-users query was requested
   worklogs: WorklogResponse[];
   byIssue: IssueAggregateResponse[];
   summary: WorklogSummaryResponse;

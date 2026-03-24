@@ -19,15 +19,16 @@ export async function getSchedule(
   uiHtml?: string
 ): Promise<CallToolResult> {
   try {
-    const { startDate, endDate } = input;
+    const { startDate, endDate, worker } = input;
 
     // Use endDate or default to startDate
     const actualEndDate = endDate || startDate;
 
-    // Fetch schedule from Tempo API (automatically filters by authenticated user)
+    // Fetch schedule from Tempo API
     const scheduleResponses = await tempoClient.getSchedule({
       startDate,
-      endDate: actualEndDate
+      endDate: actualEndDate,
+      worker
     });
 
     if (!scheduleResponses || scheduleResponses.length === 0) {

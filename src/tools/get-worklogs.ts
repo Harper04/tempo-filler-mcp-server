@@ -21,16 +21,20 @@ export async function getWorklogs(
   uiHtml?: string
 ): Promise<CallToolResult> {
   try {
-    const { startDate, endDate, issueKey } = input;
-    
+    const { startDate, endDate, issueKey, worker, allUsers, maxResults, projectKey } = input;
+
     // Use endDate or default to startDate
     const actualEndDate = endDate || startDate;
-    
-    // Fetch worklogs from Tempo API (automatically filters by authenticated user)
+
+    // Fetch worklogs from Tempo API
     const worklogResponses = await tempoClient.getWorklogs({
       from: startDate,
       to: actualEndDate,
-      issueKey: issueKey
+      issueKey,
+      worker,
+      allUsers,
+      maxResults,
+      projectKey
     });
 
     // Process and format the worklogs
@@ -44,7 +48,10 @@ export async function getWorklogs(
         issueSummary: response.issue.summary,
         date: datePart,
         hours: Math.round((response.timeSpentSeconds / 3600) * 100) / 100,
-        comment: response.comment || ''
+        comment: response.comment || '',
+        worker: response.worker || '',
+        workerDisplayName: response.workerDisplayName || '',
+        workerEmail: response.workerEmail || ''
       };
     });
 
@@ -106,6 +113,9 @@ export async function getWorklogs(
       startDate,
       endDate: actualEndDate,
       ...(issueKey && { issueFilter: issueKey }),
+      ...(projectKey && { projectFilter: projectKey }),
+      ...(worker && { workerFilter: worker }),
+      ...(allUsers && { allUsers: true }),
       worklogs,
       byIssue,
       summary: {

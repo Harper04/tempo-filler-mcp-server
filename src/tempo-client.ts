@@ -14,6 +14,7 @@ export class TempoClient {
   private axiosInstance: AxiosInstance;
   private jiraAxiosInstance: AxiosInstance | null = null;
   private issueCache: IssueCache = {};
+  private workerCache = new Map<string, { displayName: string; emailAddress: string }>();
   private config: TempoClientConfig;
   private currentUser: string | null = null;
   private isCloudMode: boolean;
@@ -173,6 +174,37 @@ export class TempoClient {
   }
 
   /**
+   * Resolve worker display name and email address, with caching.
+   */
+  private async resolveWorkerInfo(workerId: string): Promise<{ displayName: string; emailAddress: string }> {
+    if (!workerId) return { displayName: '', emailAddress: '' };
+    const cached = this.workerCache.get(workerId);
+    if (cached) return cached;
+    try {
+      let info: { displayName: string; emailAddress: string };
+      if (this.isCloudMode && this.jiraAxiosInstance) {
+        const response = await this.jiraAxiosInstance.get('/rest/api/3/user', { params: { accountId: workerId } });
+        info = {
+          displayName: response.data?.displayName || '',
+          emailAddress: response.data?.emailAddress || ''
+        };
+      } else {
+        const response = await this.axiosInstance.get('/rest/api/latest/user', { params: { key: workerId } });
+        info = {
+          displayName: response.data?.displayName || '',
+          emailAddress: response.data?.emailAddress || ''
+        };
+      }
+      this.workerCache.set(workerId, info);
+      return info;
+    } catch {
+      const info = { displayName: '', emailAddress: '' };
+      this.workerCache.set(workerId, info);
+      return info;
+    }
+  }
+
+  /**
    * Get worklogs for a user and optional date range / issue filter.
    * Cloud mode: uses Jira Cloud API for issue-specific worklogs; Tempo Cloud API for date-based.
    * Legacy mode: uses Jira API for issue-specific; Tempo search for date-based.
@@ -181,11 +213,16 @@ export class TempoClient {
     from?: string;
     to?: string;
     issueKey?: string;
+    worker?: string;
+    allUsers?: boolean;
+    maxResults?: number;
+    projectKey?: string;
   }): Promise<TempoWorklogResponse[]> {
-    const currentUser = await this.getCurrentUser();
+    // targetUser: null = no user filter (all users); string = filter to that specific user
+    const targetUser = params.allUsers ? null : (params.worker ?? await this.getCurrentUser());
 
     console.error(`🔍 WORKLOG SEARCH: Processing request for params:`, JSON.stringify(params));
-    console.error(`👤 USER: Using authenticated user ${currentUser}`);
+    console.error(`👤 USER: ${targetUser === null ? 'all users' : targetUser}`);
 
     try {
       if (params.issueKey) {
@@ -205,43 +242,55 @@ export class TempoClient {
 
         const jiraWorklogs = response.data?.worklogs || [];
 
-        const filteredWorklogs = jiraWorklogs.filter((worklog: any) =>
-          worklog.author?.name === currentUser ||
-          worklog.author?.accountId === currentUser ||
-          worklog.author?.emailAddress === currentUser
-        );
+        const filteredWorklogs = targetUser === null
+          ? jiraWorklogs
+          : jiraWorklogs.filter((worklog: any) =>
+              worklog.author?.name === targetUser ||
+              worklog.author?.accountId === targetUser ||
+              worklog.author?.emailAddress === targetUser
+            );
 
-        const convertedWorklogs = filteredWorklogs.map((worklog: any) => ({
-          id: worklog.id,
-          timeSpentSeconds: worklog.timeSpentSeconds,
-          billableSeconds: worklog.timeSpentSeconds,
-          timeSpent: worklog.timeSpent,
-          issue: {
-            id: issue.id,
-            key: params.issueKey!,
-            summary: issue.fields.summary
-          },
-          started: worklog.started,
-          worker: {
-            displayName: worklog.author?.displayName || 'Unknown',
-            accountId: worklog.author?.accountId || 'unknown'
-          },
-          attributes: {}
+        // Batch-resolve worker identity for all unique authors
+        const uniqueWorkerIds = [...new Set(filteredWorklogs.map((w: any) => w.author?.accountId || w.author?.name || '').filter(Boolean))] as string[];
+        const workerInfoMap = new Map<string, { displayName: string; emailAddress: string }>();
+        await Promise.all(uniqueWorkerIds.map(async (id) => {
+          workerInfoMap.set(id, await this.resolveWorkerInfo(id));
         }));
 
-        console.error(`🎯 CONVERTED: Returning ${convertedWorklogs.length} worklogs for user ${currentUser}`);
-        return convertedWorklogs;
+        const convertedWorklogs = filteredWorklogs.map((worklog: any) => {
+          const workerId = worklog.author?.accountId || worklog.author?.name || '';
+          const workerInfo = workerInfoMap.get(workerId) || { displayName: worklog.author?.displayName || '', emailAddress: '' };
+          return {
+            id: worklog.id,
+            timeSpentSeconds: worklog.timeSpentSeconds,
+            billableSeconds: worklog.timeSpentSeconds,
+            timeSpent: worklog.timeSpent,
+            issue: {
+              id: issue.id,
+              key: params.issueKey!,
+              summary: issue.fields.summary
+            },
+            started: worklog.started,
+            worker: workerId,
+            workerDisplayName: workerInfo.displayName,
+            workerEmail: workerInfo.emailAddress,
+            attributes: {}
+          };
+        });
+
+        console.error(`🎯 CONVERTED: Returning ${convertedWorklogs.length} worklogs`);
+        return convertedWorklogs as TempoWorklogResponse[];
       }
 
       console.error(`📅 DATE-BASED: Attempting Tempo search for date range`);
 
       if (this.isCloudMode) {
-        // Tempo Cloud API v4: GET /4/worklogs?accountId=...&from=...&to=...
+        // Tempo Cloud API v4: GET /4/worklogs — omit accountId for all-users queries
         const queryParams: any = {
-          accountId: currentUser,
           from: params.from || new Date().toISOString().slice(0, 7) + '-01',
           to: params.to || new Date().toISOString().slice(0, 10)
         };
+        if (targetUser !== null) queryParams.accountId = targetUser;
 
         console.error(`🔍 TEMPO CLOUD SEARCH: Sending GET /4/worklogs with:`, JSON.stringify(queryParams));
 
@@ -256,26 +305,50 @@ export class TempoClient {
           const page: any[] = response.data?.results || [];
           rawResults = rawResults.concat(page);
           const meta = response.data?.metadata;
-          if (!meta || rawResults.length >= meta.count || page.length < pageLimit) break;
+          const reachedMax = params.maxResults && rawResults.length >= params.maxResults;
+          if (!meta || rawResults.length >= meta.count || page.length < pageLimit || reachedMax) break;
           offset += pageLimit;
         }
+        if (params.maxResults) rawResults = rawResults.slice(0, params.maxResults);
         console.error(`📊 TEMPO CLOUD RESPONSE: Received ${rawResults.length} results`);
 
-        // Batch-resolve issue key + summary for unique issue IDs (cloud worklogs only have numeric id)
+        // Batch-resolve issue key + summary + projectKey for unique issue IDs (cloud worklogs only have numeric id)
         const uniqueIssueIds = [...new Set(rawResults.map((w: any) => String(w.issue?.id)).filter(Boolean))];
-        const issueDetails = new Map<string, { key: string; summary: string }>();
+        const issueDetails = new Map<string, { key: string; summary: string; projectKey: string }>();
         await Promise.all(uniqueIssueIds.map(async (issueId) => {
           try {
             const issue = await this.getIssueById(issueId);
-            issueDetails.set(issueId, { key: issue.key, summary: issue.fields.summary });
+            issueDetails.set(issueId, {
+              key: issue.key,
+              summary: issue.fields.summary,
+              projectKey: issue.fields.project?.key || ''
+            });
           } catch {
-            issueDetails.set(issueId, { key: issueId, summary: '' });
+            issueDetails.set(issueId, { key: issueId, summary: '', projectKey: '' });
           }
+        }));
+
+        // Apply project filter after issue resolution (cloud API has no server-side projectKey filter)
+        if (params.projectKey) {
+          const filterKey = params.projectKey.toUpperCase();
+          rawResults = rawResults.filter((w: any) => {
+            const detail = issueDetails.get(String(w.issue?.id));
+            return (detail?.projectKey || '').toUpperCase() === filterKey;
+          });
+        }
+
+        // Batch-resolve worker identity for all unique authors
+        const uniqueWorkerIds = [...new Set(rawResults.map((w: any) => w.author?.accountId || '').filter(Boolean))] as string[];
+        const workerInfoMap = new Map<string, { displayName: string; emailAddress: string }>();
+        await Promise.all(uniqueWorkerIds.map(async (id) => {
+          workerInfoMap.set(id, await this.resolveWorkerInfo(id));
         }));
 
         // Normalize cloud shape to match TempoWorklogResponse expected by the tools
         return rawResults.map((w: any) => {
           const detail = issueDetails.get(String(w.issue?.id));
+          const workerId = w.author?.accountId || '';
+          const workerInfo = workerInfoMap.get(workerId) || { displayName: '', emailAddress: '' };
           return {
             id: w.tempoWorklogId?.toString(),
             tempoWorklogId: w.tempoWorklogId,
@@ -299,7 +372,9 @@ export class TempoClient {
               iconUrl: '',
               versions: [],
             },
-            worker: w.author?.accountId || '',
+            worker: workerId,
+            workerDisplayName: workerInfo.displayName,
+            workerEmail: workerInfo.emailAddress,
             updater: '',
             originId: 0,
             originTaskId: w.issue?.id || 0,
@@ -311,10 +386,11 @@ export class TempoClient {
       } else {
         // Legacy: POST /rest/tempo-timesheets/4/worklogs/search
         const searchParams: any = {
-          from: params.from || '2025-07-01',
-          to: params.to || '2025-07-31',
-          worker: [currentUser]
+          from: params.from || new Date().toISOString().slice(0, 7) + '-01',
+          to: params.to || new Date().toISOString().slice(0, 10),
         };
+        if (targetUser !== null) searchParams.worker = [targetUser];
+        if (params.projectKey) searchParams.projectKey = params.projectKey;
 
         console.error(`🔍 TEMPO SEARCH: Sending request with:`, JSON.stringify(searchParams));
 
@@ -325,7 +401,22 @@ export class TempoClient {
 
         console.error(`📊 TEMPO RESPONSE: Received ${Array.isArray(response.data) ? response.data.length : 'non-array'} results`);
 
-        return Array.isArray(response.data) ? response.data : [];
+        let legacyResults: TempoWorklogResponse[] = Array.isArray(response.data) ? response.data : [];
+        if (params.maxResults) legacyResults = legacyResults.slice(0, params.maxResults);
+
+        // Batch-resolve worker identity for legacy results
+        const uniqueWorkerIds = [...new Set(legacyResults.map((w: any) => w.worker || '').filter(Boolean))] as string[];
+        const workerInfoMap = new Map<string, { displayName: string; emailAddress: string }>();
+        await Promise.all(uniqueWorkerIds.map(async (id) => {
+          workerInfoMap.set(id, await this.resolveWorkerInfo(id));
+        }));
+        legacyResults.forEach((w: any) => {
+          const info = workerInfoMap.get(w.worker || '') || { displayName: '', emailAddress: '' };
+          w.workerDisplayName = info.displayName;
+          w.workerEmail = info.emailAddress;
+        });
+
+        return legacyResults;
       }
     } catch (error) {
       console.error(`❌ ERROR in getWorklogs:`, error);
@@ -345,11 +436,11 @@ export class TempoClient {
    * Cloud mode: uses Tempo Cloud API v4 GET /4/user-schedule.
    * Legacy mode: uses POST /rest/tempo-core/2/user/schedule/search.
    */
-  async getSchedule(params: GetScheduleParams): Promise<TempoScheduleResponse[]> {
-    const currentUser = await this.getCurrentUser();
+  async getSchedule(params: GetScheduleParams & { worker?: string }): Promise<TempoScheduleResponse[]> {
+    const targetUser = params.worker ?? await this.getCurrentUser();
 
     console.error(`📅 SCHEDULE SEARCH: Processing request for params:`, JSON.stringify(params));
-    console.error(`👤 USER: Using authenticated user ${currentUser}`);
+    console.error(`👤 USER: ${targetUser}`);
 
     try {
       const { startDate, endDate } = params;
@@ -358,7 +449,7 @@ export class TempoClient {
       if (this.isCloudMode) {
         // Tempo Cloud API v4: GET /4/user-schedule?accountId=...&from=...&to=...
         const queryParams = {
-          accountId: currentUser,
+          accountId: targetUser,
           from: startDate,
           to: actualEndDate
         };
@@ -382,14 +473,14 @@ export class TempoClient {
               type: d.type as 'WORKING_DAY' | 'NON_WORKING_DAY'
             }))
           },
-          user: { username: currentUser, displayName: '', key: currentUser }
+          user: { username: targetUser, displayName: '', key: targetUser }
         }];
       } else {
         // Legacy: POST /rest/tempo-core/2/user/schedule/search
         const searchParams = {
           from: startDate,
           to: actualEndDate,
-          userKeys: [currentUser]
+          userKeys: [targetUser]
         };
 
         console.error(`🔍 TEMPO SCHEDULE SEARCH: Sending request with:`, JSON.stringify(searchParams));
@@ -510,9 +601,10 @@ export class TempoClient {
     endDate?: string;
     billable?: boolean;
     description?: string;
+    worker?: string;
   }): Promise<TempoWorklogCreatePayload> {
     const issue = await this.getIssueById(params.issueKey);
-    const currentUser = await this.getCurrentUser();
+    const resolvedWorker = params.worker ?? await this.getCurrentUser();
 
     const timeInSeconds = this.hoursToSeconds(params.hours);
     const startDate = params.startDate;
@@ -522,7 +614,7 @@ export class TempoClient {
       attributes: {},
       billableSeconds: params.billable !== false ? timeInSeconds : 0,
       timeSpentSeconds: timeInSeconds,
-      worker: currentUser,
+      worker: resolvedWorker,
       started: `${startDate}T00:00:00.000`,
       originTaskId: issue.id,
       remainingEstimate: null,
@@ -543,6 +635,7 @@ export class TempoClient {
     endDate?: string;
     billable?: boolean;
     description?: string;
+    worker?: string;
   }>): Promise<Array<{
     success: boolean;
     worklog?: TempoWorklogResponse;

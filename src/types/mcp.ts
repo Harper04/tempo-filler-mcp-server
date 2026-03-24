@@ -9,6 +9,10 @@ export const GetWorklogsInputSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be in YYYY-MM-DD format"),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be in YYYY-MM-DD format").optional(),
   issueKey: z.string().optional(),
+  worker: z.string().optional(),
+  allUsers: z.boolean().optional(),
+  maxResults: z.number().int().min(1).optional(),
+  projectKey: z.string().optional(),
 });
 
 // Post worklog tool input schema
@@ -19,6 +23,7 @@ export const PostWorklogInputSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be in YYYY-MM-DD format").optional(),
   billable: z.boolean().optional(),
   description: z.string().optional(),
+  worker: z.string().optional(),
 });
 
 // Bulk worklog entry schema
@@ -33,6 +38,7 @@ export const BulkWorklogEntrySchema = z.object({
 export const BulkPostWorklogsInputSchema = z.object({
   worklogs: z.array(BulkWorklogEntrySchema).min(1, "At least one worklog entry is required"),
   billable: z.boolean().optional(),
+  worker: z.string().optional(),
 });
 
 // Delete worklog tool input schema
@@ -44,6 +50,7 @@ export const DeleteWorklogInputSchema = z.object({
 export const GetScheduleInputSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be in YYYY-MM-DD format"),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be in YYYY-MM-DD format").optional(),
+  worker: z.string().optional(),
 });
 
 // Worklog summary prompt arguments schema

@@ -18,7 +18,7 @@ export async function bulkPostWorklogs(
   input: BulkPostWorklogsInput
 ): Promise<CallToolResult> {
   try {
-    const { worklogs, billable = true } = input;
+    const { worklogs, billable = true, worker } = input;
 
     if (worklogs.length === 0) {
       return {
@@ -45,14 +45,15 @@ export async function bulkPostWorklogs(
       };
     }
 
-    // Convert bulk entries to the format expected by the Tempo client (worker auto-determined)
+    // Convert bulk entries to the format expected by the Tempo client
     const worklogParams = worklogs.map((entry: BulkWorklogEntry) => ({
       issueKey: entry.issueKey,
       hours: entry.hours,
       startDate: entry.date,
-      endDate: entry.date, // Single day entries
+      endDate: entry.date,
       billable,
-      description: entry.description
+      description: entry.description,
+      worker
     }));
 
     // Use the Tempo client's batch creation method (implements Promise.all internally)

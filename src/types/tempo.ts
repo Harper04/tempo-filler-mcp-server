@@ -58,6 +58,9 @@ export interface TempoWorklogResponse {
   dateUpdated: string;           // Update timestamp
   remainingEstimate?: number;     // Remaining time estimate
   endDate?: string;              // End date for multi-day entries
+  // Enriched by getWorklogs() — not present in raw API response
+  workerDisplayName?: string;
+  workerEmail?: string;
 }
 
 // Processed worklog structure for MCP responses
