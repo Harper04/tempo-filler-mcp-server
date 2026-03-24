@@ -101,7 +101,7 @@ export async function getSchedule(
     } else if (errorMessage.includes('Access forbidden')) {
       enhancedErrorMessage += `\n\nTip: Make sure you have permission to access schedule data in Tempo.`;
     } else if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-      enhancedErrorMessage = `Schedule endpoint not found. This may indicate that Tempo Core API v2 is not available on your JIRA instance.\n\nTip: Verify that Tempo is properly installed and the Core API is enabled.`;
+      enhancedErrorMessage = `Schedule endpoint not found. Verify that Tempo is properly configured and the schedule API is accessible.\n\nTip: For Atlassian Cloud ensure TEMPO_BASE_URL=https://api.tempo.io. For self-hosted, verify the Tempo Core plugin is installed.`;
     }
 
     return {

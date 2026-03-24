@@ -245,9 +245,20 @@ export class TempoClient {
 
         console.error(`🔍 TEMPO CLOUD SEARCH: Sending GET /4/worklogs with:`, JSON.stringify(queryParams));
 
-        const response = await this.axiosInstance.get('/4/worklogs', { params: queryParams });
-
-        const rawResults: any[] = response.data?.results || [];
+        // Paginate: Tempo Cloud defaults to 50/page; fetch all pages up to 1000 each
+        let rawResults: any[] = [];
+        let offset = 0;
+        const pageLimit = 1000;
+        while (true) {
+          const response = await this.axiosInstance.get('/4/worklogs', {
+            params: { ...queryParams, limit: pageLimit, offset }
+          });
+          const page: any[] = response.data?.results || [];
+          rawResults = rawResults.concat(page);
+          const meta = response.data?.metadata;
+          if (!meta || rawResults.length >= meta.count || page.length < pageLimit) break;
+          offset += pageLimit;
+        }
         console.error(`📊 TEMPO CLOUD RESPONSE: Received ${rawResults.length} results`);
 
         // Batch-resolve issue key + summary for unique issue IDs (cloud worklogs only have numeric id)
@@ -277,10 +288,25 @@ export class TempoClient {
               id: w.issue?.id,
               key: detail?.key || String(w.issue?.id || ''),
               summary: detail?.summary || '',
+              internalIssue: false,
+              issueStatus: '',
+              reporterKey: '',
+              estimatedRemainingSeconds: 0,
+              components: [],
+              issueType: '',
+              projectId: 0,
+              projectKey: '',
+              iconUrl: '',
+              versions: [],
             },
             worker: w.author?.accountId || '',
+            updater: '',
+            originId: 0,
+            originTaskId: w.issue?.id || 0,
+            dateCreated: w.createdAt || '',
+            dateUpdated: w.updatedAt || '',
             attributes: {},
-          };
+          } as TempoWorklogResponse;
         });
       } else {
         // Legacy: POST /rest/tempo-timesheets/4/worklogs/search
@@ -341,10 +367,23 @@ export class TempoClient {
 
         const response = await this.axiosInstance.get('/4/user-schedule', { params: queryParams });
 
-        console.error(`📊 TEMPO CLOUD SCHEDULE RESPONSE: Received ${response.data?.results?.length || 0} results`);
+        const rawDays: any[] = response.data?.results || [];
+        console.error(`📊 TEMPO CLOUD SCHEDULE RESPONSE: Received ${rawDays.length} results`);
 
-        const results = response.data?.results || [];
-        return results;
+        // Normalize flat cloud day list → TempoScheduleResponse shape expected by tools
+        const totalRequiredSeconds = rawDays.reduce((s: number, d: any) => s + (d.requiredSeconds || 0), 0);
+        return [{
+          schedule: {
+            numberOfWorkingDays: rawDays.filter((d: any) => d.type === 'WORKING_DAY').length,
+            requiredSeconds: totalRequiredSeconds,
+            days: rawDays.map((d: any) => ({
+              date: d.date,
+              requiredSeconds: d.requiredSeconds || 0,
+              type: d.type as 'WORKING_DAY' | 'NON_WORKING_DAY'
+            }))
+          },
+          user: { username: currentUser, displayName: '', key: currentUser }
+        }];
       } else {
         // Legacy: POST /rest/tempo-core/2/user/schedule/search
         const searchParams = {
@@ -402,7 +441,16 @@ export class TempoClient {
           cloudPayload
         );
 
-        return response.data;
+        // Enrich response with issue key/summary from cache (cloud response only contains issue.id)
+        const data = response.data as any;
+        if (data.issue) {
+          const issueId = String(data.issue.id);
+          const cached = this.issueCache[issueId] || this.issueCache[payload.originTaskId];
+          if (cached) {
+            data.issue = { ...data.issue, key: cached.key, summary: cached.summary };
+          }
+        }
+        return data;
       } else {
         // Legacy: returns an array with a single worklog
         const response: AxiosResponse<TempoWorklogResponse[]> = await this.axiosInstance.post(

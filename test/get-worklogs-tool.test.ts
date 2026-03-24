@@ -89,6 +89,20 @@ describe("get_worklogs tool", () => {
     console.log(`  → Sample: ${JSON.stringify(data.worklogs[0])}`);
   });
 
+  it("schedule array is populated (cloud normalization check)", async () => {
+    const result = await getWorklogs(client, { startDate, endDate });
+    const data = JSON.parse(result.content[0].text as string);
+
+    // Schedule is fetched internally by the tool; verifies cloud /4/user-schedule normalization
+    assert.ok(Array.isArray(data.schedule), "schedule should be an array");
+    assert.ok(data.schedule.length > 0, "schedule should be non-empty for a range with working days");
+
+    const day = data.schedule[0];
+    assert.ok(typeof day.date === "string", "schedule day should have a date string");
+    assert.ok(typeof day.isWorkingDay === "boolean", "schedule day should have isWorkingDay boolean");
+    console.log(`  → Schedule has ${data.schedule.length} days; sample: ${JSON.stringify(data.schedule[0])}`);
+  });
+
   it("byIssue aggregation totals match worklogs total", async () => {
     const result = await getWorklogs(client, { startDate, endDate });
     const data = JSON.parse(result.content[0].text as string);
