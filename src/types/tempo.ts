@@ -178,6 +178,7 @@ export interface IssueCache {
     id: string;
     key: string;    // actual Jira issue key (e.g. PROJ-123)
     summary: string;
+    projectKey: string;  // project key (e.g. PROJ)
     cached: Date;
   };
 }

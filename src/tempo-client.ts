@@ -140,7 +140,8 @@ export class TempoClient {
         id: cached.id,
         key: cached.key,
         fields: {
-          summary: cached.summary
+          summary: cached.summary,
+          project: cached.projectKey ? { key: cached.projectKey, name: '' } : undefined
         }
       };
     }
@@ -157,6 +158,7 @@ export class TempoClient {
         id: issue.id,
         key: issue.key,
         summary: issue.fields.summary,
+        projectKey: issue.fields.project?.key || '',
         cached: new Date()
       };
       this.issueCache[issueKey] = cacheEntry;
