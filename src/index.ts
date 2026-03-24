@@ -153,7 +153,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: TOOL_NAMES.GET_WORKLOGS,
-        description: "Retrieve worklogs for authenticated user and date range",
+        description: "Retrieve worklogs for a date range. Defaults to authenticated user. Use 'worker' to query a specific user (accountId for Cloud, username for self-hosted), 'allUsers: true' for all users (admin), 'projectKey' to filter by project, 'maxResults' to cap pagination.",
         inputSchema: {
           type: "object",
           properties: {
@@ -169,7 +169,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             issueKey: {
               type: "string",
-              description: "Optional filter by specific issue key (e.g., PROJ-1234)",
+              description: "Filter by specific issue key (e.g., PROJ-1234)",
+            },
+            worker: {
+              type: "string",
+              description: "Filter to a specific user: Atlassian accountId (Cloud) or Jira username (self-hosted). Omit for authenticated user.",
+            },
+            allUsers: {
+              type: "boolean",
+              description: "If true, return worklogs for all users (requires admin permissions). Default: false.",
+            },
+            maxResults: {
+              type: "integer",
+              minimum: 1,
+              description: "Maximum total worklogs to return across all pages. Default: unlimited.",
+            },
+            projectKey: {
+              type: "string",
+              description: "Filter by Jira project key (e.g., PROJ). Case-insensitive.",
             },
           },
           required: ["startDate"],
@@ -180,7 +197,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: TOOL_NAMES.POST_WORKLOG,
-        description: "Create a new worklog entry. For better results, consider using get_schedule first to verify working days and expected hours.",
+        description: "Create a new worklog entry. For better results, consider using get_schedule first to verify working days and expected hours. Use 'worker' to log time on behalf of another user (admin).",
         inputSchema: {
           type: "object",
           properties: {
@@ -212,13 +229,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "Work description (optional)",
             },
+            worker: {
+              type: "string",
+              description: "Log time as this user: Atlassian accountId (Cloud) or Jira username (self-hosted). Omit to log as authenticated user.",
+            },
           },
           required: ["issueKey", "hours", "startDate"],
         },
       },
       {
         name: TOOL_NAMES.BULK_POST_WORKLOGS,
-        description: "Create multiple worklog entries from a structured format. RECOMMENDED: Use get_schedule first to identify working days and avoid logging time on non-working days.",
+        description: "Create multiple worklog entries from a structured format. RECOMMENDED: Use get_schedule first to identify working days and avoid logging time on non-working days. Use 'worker' to log time on behalf of another user (admin).",
         inputSchema: {
           type: "object",
           properties: {
@@ -255,6 +276,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "boolean",
               description: "Whether the time is billable for all entries (default: true)",
             },
+            worker: {
+              type: "string",
+              description: "Log time as this user for all entries: Atlassian accountId (Cloud) or Jira username (self-hosted). Omit to log as authenticated user.",
+            },
           },
           required: ["worklogs"],
         },
@@ -275,7 +300,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: TOOL_NAMES.GET_SCHEDULE,
-        description: "Retrieve work schedule for authenticated user and date range",
+        description: "Retrieve work schedule for a date range. Defaults to authenticated user. Use 'worker' to query another user's schedule.",
         inputSchema: {
           type: "object",
           properties: {
@@ -288,6 +313,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               pattern: "^\\d{4}-\\d{2}-\\d{2}$",
               description: "End date in YYYY-MM-DD format (optional, defaults to startDate)",
+            },
+            worker: {
+              type: "string",
+              description: "Retrieve schedule for this user: Atlassian accountId (Cloud) or Jira username (self-hosted). Omit for authenticated user.",
             },
           },
           required: ["startDate"],
