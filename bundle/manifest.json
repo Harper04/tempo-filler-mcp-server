@@ -1,7 +1,7 @@
 {
   "dxt_version": "0.2",
   "name": "TempoFiller MCP Server",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "A Model Context Protocol (MCP) server for managing Tempo worklogs in JIRA. Supports both Atlassian Cloud and self-hosted Jira instances. Enables AI assistants to retrieve, create, bulk-create, and delete worklogs, and check work schedules.",
   "author": {
     "name": "JuanjoFuchs",
