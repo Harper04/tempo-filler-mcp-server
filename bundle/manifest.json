@@ -2,7 +2,7 @@
   "dxt_version": "0.2",
   "name": "TempoFiller MCP Server",
   "version": "2.0.2",
-  "description": "A Model Context Protocol (MCP) server for managing Tempo worklogs in JIRA. This server enables AI assistants to interact with Tempo's time tracking system, allowing for worklog retrieval, creation, bulk operations, and management.",
+  "description": "A Model Context Protocol (MCP) server for managing Tempo worklogs in JIRA. Supports both Atlassian Cloud and self-hosted Jira instances. Enables AI assistants to retrieve, create, bulk-create, and delete worklogs, and check work schedules.",
   "author": {
     "name": "JuanjoFuchs",
     "email": "juanjose.fuchs@tranzact.net"
@@ -16,7 +16,10 @@
       "env": {
         "TEMPO_BASE_URL": "${user_config.tempo_base_url}",
         "TEMPO_PAT": "${user_config.tempo_pat}",
-        "TEMPO_DEFAULT_HOURS": "${user_config.tempo_default_hours}"
+        "TEMPO_DEFAULT_HOURS": "${user_config.tempo_default_hours}",
+        "JIRA_BASE_URL": "${user_config.jira_base_url}",
+        "JIRA_EMAIL": "${user_config.jira_email}",
+        "JIRA_API_TOKEN": "${user_config.jira_api_token}"
       }
     }
   },
@@ -24,14 +27,33 @@
     "tempo_base_url": {
       "type": "string",
       "title": "Tempo Base URL",
-      "description": "Your JIRA/Tempo instance base URL (e.g., https://your-company.atlassian.net)",
+      "description": "Tempo API base URL. For Atlassian Cloud use: https://api.tempo.io — For self-hosted Jira use your Jira instance URL (e.g., https://jira.company.com)",
       "required": true
     },
     "tempo_pat": {
       "type": "string",
       "title": "Tempo Personal Access Token",
-      "description": "Your Tempo Personal Access Token for API authentication",
+      "description": "Your Tempo Personal Access Token. In Tempo: Settings → API Integration → New Token",
       "required": true,
+      "sensitive": true
+    },
+    "jira_base_url": {
+      "type": "string",
+      "title": "Jira Base URL (Cloud only)",
+      "description": "Your Atlassian Cloud Jira instance URL (e.g., https://your-instance.atlassian.net). Leave blank for self-hosted Jira.",
+      "required": false
+    },
+    "jira_email": {
+      "type": "string",
+      "title": "Jira Email (Cloud only)",
+      "description": "Your Atlassian account email address. Required when using Atlassian Cloud.",
+      "required": false
+    },
+    "jira_api_token": {
+      "type": "string",
+      "title": "Jira API Token (Cloud only)",
+      "description": "Your Atlassian API token. Generate one at: https://id.atlassian.com/manage-profile/security/api-tokens. Required when using Atlassian Cloud.",
+      "required": false,
       "sensitive": true
     },
     "tempo_default_hours": {
@@ -59,6 +81,6 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "https://github.com/TRANZACT/tempo-filler-mcp-server"
+    "url": "https://github.com/Harper04/tempo-filler-mcp-server"
   }
 }
