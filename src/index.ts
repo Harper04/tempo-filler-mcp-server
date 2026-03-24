@@ -47,16 +47,30 @@ import {
 } from "./types/index.js";
 
 // Environment configuration
+const jiraBaseUrl = process.env[ENV_VARS.JIRA_BASE_URL] || '';
+const isCloudMode = !!jiraBaseUrl;
+
 const config = {
   baseUrl: process.env[ENV_VARS.TEMPO_BASE_URL] || '',
   personalAccessToken: process.env[ENV_VARS.TEMPO_PAT] || '',
   defaultHours: parseInt(process.env[ENV_VARS.TEMPO_DEFAULT_HOURS] || String(DEFAULTS.HOURS_PER_DAY)),
+  ...(isCloudMode && {
+    jiraBaseUrl,
+    jiraEmail: process.env[ENV_VARS.JIRA_EMAIL] || '',
+    jiraApiToken: process.env[ENV_VARS.JIRA_API_TOKEN] || '',
+  }),
 };
 
 // Debug logging
 console.error(`Debug: ${ENV_VARS.TEMPO_BASE_URL} = ${config.baseUrl ? '[CONFIGURED]' : '[MISSING]'}`);
 console.error(`Debug: ${ENV_VARS.TEMPO_PAT} = ${config.personalAccessToken ? '[CONFIGURED - length: ' + config.personalAccessToken.length + ']' : '[MISSING]'}`);
 console.error(`Debug: ${ENV_VARS.TEMPO_DEFAULT_HOURS} = ${config.defaultHours}`);
+console.error(`Debug: Mode = ${isCloudMode ? 'Cloud (Atlassian Cloud)' : 'Legacy (self-hosted)'}`);
+if (isCloudMode) {
+  console.error(`Debug: ${ENV_VARS.JIRA_BASE_URL} = ${jiraBaseUrl}`);
+  console.error(`Debug: ${ENV_VARS.JIRA_EMAIL} = ${config.jiraEmail ? '[CONFIGURED]' : '[MISSING]'}`);
+  console.error(`Debug: ${ENV_VARS.JIRA_API_TOKEN} = ${config.jiraApiToken ? '[CONFIGURED]' : '[MISSING]'}`);
+}
 
 // Validate required configuration
 if (!config.baseUrl) {
@@ -67,6 +81,17 @@ if (!config.baseUrl) {
 if (!config.personalAccessToken) {
   console.error(`Error: ${ENV_VARS.TEMPO_PAT} environment variable is required`);
   process.exit(1);
+}
+
+if (isCloudMode) {
+  if (!config.jiraEmail) {
+    console.error(`Error: ${ENV_VARS.JIRA_EMAIL} is required when ${ENV_VARS.JIRA_BASE_URL} is set`);
+    process.exit(1);
+  }
+  if (!config.jiraApiToken) {
+    console.error(`Error: ${ENV_VARS.JIRA_API_TOKEN} is required when ${ENV_VARS.JIRA_BASE_URL} is set`);
+    process.exit(1);
+  }
 }
 
 // Initialize Tempo client

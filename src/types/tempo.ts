@@ -159,10 +159,14 @@ export interface DeleteWorklogParams {
 
 // Configuration for Tempo client
 export interface TempoClientConfig {
-  baseUrl: string;        // JIRA instance URL
-  personalAccessToken: string; // PAT for authentication
-  defaultHours?: number;  // Default hours per workday (8)
-  timeout?: number;       // Request timeout in milliseconds
+  baseUrl: string;                // Tempo base URL (or Jira URL in legacy mode)
+  personalAccessToken: string;    // Tempo PAT for authentication
+  defaultHours?: number;          // Default hours per workday (8)
+  timeout?: number;               // Request timeout in milliseconds
+  // Atlassian Cloud fields (optional - enables cloud mode when jiraBaseUrl is set)
+  jiraBaseUrl?: string;           // e.g. https://your-instance.atlassian.net
+  jiraEmail?: string;             // Atlassian account email
+  jiraApiToken?: string;          // Atlassian API token
 }
 
 // Issue cache entry for performance optimization

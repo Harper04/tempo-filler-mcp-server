@@ -101,8 +101,11 @@ export const RESOURCE_NAMES = {
 // Environment variable names
 export const ENV_VARS = {
   TEMPO_BASE_URL: "TEMPO_BASE_URL",
-  TEMPO_PAT: "TEMPO_PAT", 
+  TEMPO_PAT: "TEMPO_PAT",
   TEMPO_DEFAULT_HOURS: "TEMPO_DEFAULT_HOURS",
+  JIRA_BASE_URL: "JIRA_BASE_URL",
+  JIRA_API_TOKEN: "JIRA_API_TOKEN",
+  JIRA_EMAIL: "JIRA_EMAIL",
 } as const;
 
 // Default configuration values

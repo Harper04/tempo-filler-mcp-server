@@ -212,18 +212,77 @@ For development or customization:
 
 ## ⚙️ Configuration
 
-The server requires environment variables for authentication and configuration:
+The server supports two modes: **Atlassian Cloud** and **Self-Hosted (Legacy)**.
 
-### Required Environment Variables
+---
 
-- `TEMPO_BASE_URL`: Your JIRA instance URL (e.g., `https://jira.company.com`)
-- `TEMPO_PAT`: Personal Access Token for authentication
+### Atlassian Cloud
 
-### Optional Environment Variables
+Use this when your Jira is hosted at `https://<instance>.atlassian.net` and Tempo is the cloud add-on (API at `https://api.tempo.io`).
 
-- `TEMPO_DEFAULT_HOURS`: Default hours per workday (default: 8)
+```json
+{
+  "mcpServers": {
+    "tempo-filler": {
+      "command": "npx",
+      "args": ["@tranzact/tempo-filler-mcp-server"],
+      "env": {
+        "TEMPO_BASE_URL": "https://api.tempo.io",
+        "TEMPO_PAT": "your-tempo-personal-access-token",
+        "JIRA_BASE_URL": "https://your-instance.atlassian.net",
+        "JIRA_API_TOKEN": "your-atlassian-api-token",
+        "JIRA_EMAIL": "your-email@example.com"
+      }
+    }
+  }
+}
+```
 
-### Creating a Personal Access Token (PAT)
+**Environment variables:**
+
+| Variable | Required | Description |
+|---|---|---|
+| `TEMPO_BASE_URL` | Yes | Tempo Cloud API base: `https://api.tempo.io` |
+| `TEMPO_PAT` | Yes | Tempo Personal Access Token (from Tempo → Settings → API Integration) |
+| `JIRA_BASE_URL` | Yes | Your Atlassian Cloud instance URL (enables Cloud mode) |
+| `JIRA_API_TOKEN` | Yes | Atlassian API token (from https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `JIRA_EMAIL` | Yes | Your Atlassian account email address |
+| `TEMPO_DEFAULT_HOURS` | No | Default hours per workday (default: 8) |
+
+**How to get your Tempo PAT:** In Tempo, go to **Settings** → **API Integration** → **New Token**.
+
+**How to get your Atlassian API Token:** Visit https://id.atlassian.com/manage-profile/security/api-tokens → **Create API token**.
+
+---
+
+### Self-Hosted (Legacy)
+
+Use this when Jira and Tempo are both on your own server (e.g., `https://jira.company.com`).
+
+```json
+{
+  "mcpServers": {
+    "tempo-filler": {
+      "command": "npx",
+      "args": ["@tranzact/tempo-filler-mcp-server"],
+      "env": {
+        "TEMPO_BASE_URL": "https://your-jira-instance.com",
+        "TEMPO_PAT": "your-personal-access-token"
+      }
+    }
+  }
+}
+```
+
+**Environment variables:**
+
+| Variable | Required | Description |
+|---|---|---|
+| `TEMPO_BASE_URL` | Yes | Your self-hosted Jira instance URL |
+| `TEMPO_PAT` | Yes | Jira Personal Access Token |
+| `TEMPO_DEFAULT_HOURS` | No | Default hours per workday (default: 8) |
+
+### Creating a Self-Hosted Personal Access Token (PAT)
 
 1. Log into your JIRA instance
 2. Go to **Profile** → **Personal Access Tokens**
