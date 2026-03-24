@@ -46,6 +46,8 @@ export async function getWorklogs(
         id: response.tempoWorklogId?.toString() || response.id || 'unknown',
         issueKey: response.issue.key,
         issueSummary: response.issue.summary,
+        projectKey: response.issue.projectKey || response.issue.key?.split('-')[0] || '',
+        projectId: response.issue.projectId || 0,
         date: datePart,
         hours: Math.round((response.timeSpentSeconds / 3600) * 100) / 100,
         comment: response.comment || '',
@@ -59,7 +61,7 @@ export async function getWorklogs(
     const totalHours = Math.round(worklogs.reduce((sum, worklog) => sum + worklog.hours, 0) * 100) / 100;
 
     // Group by issue for aggregation
-    const issueMap = new Map<string, { issueSummary: string; totalHours: number; entryCount: number }>();
+    const issueMap = new Map<string, { issueSummary: string; projectKey: string; totalHours: number; entryCount: number }>();
     for (const worklog of worklogs) {
       const existing = issueMap.get(worklog.issueKey);
       if (existing) {
@@ -68,6 +70,7 @@ export async function getWorklogs(
       } else {
         issueMap.set(worklog.issueKey, {
           issueSummary: worklog.issueSummary,
+          projectKey: worklog.projectKey,
           totalHours: worklog.hours,
           entryCount: 1
         });
@@ -78,6 +81,7 @@ export async function getWorklogs(
     const byIssue: IssueAggregateResponse[] = Array.from(issueMap.entries()).map(([key, data]) => ({
       issueKey: key,
       issueSummary: data.issueSummary,
+      projectKey: data.projectKey,
       totalHours: Math.round(data.totalHours * 100) / 100,
       entryCount: data.entryCount
     }));

@@ -187,7 +187,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             projectKey: {
               type: "string",
-              description: "Filter by Jira project key (e.g., PROJ). Case-insensitive.",
+              description: "Filter worklogs to a specific Jira project by its short key (e.g., 'FIF', 'KAPP'). Use list_projects to discover available project keys. Server-side filtered for performance.",
             },
           },
           required: ["startDate"],

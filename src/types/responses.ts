@@ -35,6 +35,8 @@ export interface WorklogResponse {
   id: string;
   issueKey: string;
   issueSummary: string;
+  projectKey: string;          // Jira project key (e.g., "FIF")
+  projectId: number;           // Numeric Jira project ID
   date: string;                // "2026-01-02" (ISO 8601)
   hours: number;               // decimal
   comment: string;
@@ -46,6 +48,7 @@ export interface WorklogResponse {
 export interface IssueAggregateResponse {
   issueKey: string;
   issueSummary: string;
+  projectKey: string;          // Jira project key (e.g., "FIF")
   totalHours: number;
   entryCount: number;
 }
