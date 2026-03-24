@@ -15,6 +15,7 @@ export class TempoClient {
   private jiraAxiosInstance: AxiosInstance | null = null;
   private issueCache: IssueCache = {};
   private workerCache = new Map<string, { displayName: string; emailAddress: string }>();
+  private projectCache = new Map<string, { id: string; key: string; name: string }>();
   private config: TempoClientConfig;
   private currentUser: string | null = null;
   private isCloudMode: boolean;
@@ -207,6 +208,53 @@ export class TempoClient {
   }
 
   /**
+   * Resolve a project key (e.g. "FIF") to its numeric Jira project ID.
+   */
+  async getProjectId(projectKey: string): Promise<number> {
+    const cached = this.projectCache.get(projectKey.toUpperCase());
+    if (cached) return parseInt(cached.id, 10);
+    try {
+      const instance = this.isCloudMode && this.jiraAxiosInstance ? this.jiraAxiosInstance : this.axiosInstance;
+      const path = this.isCloudMode
+        ? `/rest/api/3/project/${encodeURIComponent(projectKey)}`
+        : `/rest/api/latest/project/${encodeURIComponent(projectKey)}`;
+      const response = await instance.get(path);
+      const project = response.data;
+      this.projectCache.set(projectKey.toUpperCase(), {
+        id: String(project.id),
+        key: project.key,
+        name: project.name
+      });
+      return parseInt(project.id, 10);
+    } catch (error) {
+      throw new Error(`Project '${projectKey}' not found or not accessible.`);
+    }
+  }
+
+  /**
+   * List all Jira projects accessible to the authenticated user.
+   */
+  async getProjects(): Promise<Array<{ id: string; key: string; name: string }>> {
+    try {
+      const instance = this.isCloudMode && this.jiraAxiosInstance ? this.jiraAxiosInstance : this.axiosInstance;
+      const path = this.isCloudMode ? '/rest/api/3/project' : '/rest/api/latest/project';
+      const response = await instance.get(path);
+      const projects = (response.data || []).map((p: any) => ({
+        id: String(p.id),
+        key: p.key,
+        name: p.name
+      }));
+      // Populate project cache
+      for (const p of projects) {
+        this.projectCache.set(p.key.toUpperCase(), p);
+      }
+      return projects;
+    } catch (error) {
+      throw new Error(`Failed to list projects: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Get worklogs for a user and optional date range / issue filter.
    * Cloud mode: uses Jira Cloud API for issue-specific worklogs; Tempo Cloud API for date-based.
    * Legacy mode: uses Jira API for issue-specific; Tempo search for date-based.
@@ -293,6 +341,7 @@ export class TempoClient {
           to: params.to || new Date().toISOString().slice(0, 10)
         };
         if (targetUser !== null) queryParams.accountId = targetUser;
+        if (params.projectKey) queryParams.projectId = await this.getProjectId(params.projectKey);
 
         console.error(`🔍 TEMPO CLOUD SEARCH: Sending GET /4/worklogs with:`, JSON.stringify(queryParams));
 
@@ -331,15 +380,6 @@ export class TempoClient {
             issueDetails.set(issueId, { key: issueId, summary: '', projectKey: '' });
           }
         }));
-
-        // Apply project filter after issue resolution (cloud API has no server-side projectKey filter)
-        if (params.projectKey) {
-          const filterKey = params.projectKey.toUpperCase();
-          rawResults = rawResults.filter((w: any) => {
-            const detail = issueDetails.get(String(w.issue?.id));
-            return (detail?.projectKey || '').toUpperCase() === filterKey;
-          });
-        }
 
         // Batch-resolve worker identity for all unique authors
         const uniqueWorkerIds = [...new Set(rawResults.map((w: any) => w.author?.accountId || '').filter(Boolean))] as string[];

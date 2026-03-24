@@ -118,3 +118,20 @@ export interface DeleteWorklogJsonResponse {
   success: true;
   deletedWorklogId: string;
 }
+
+// ============================================================================
+// list_projects Response Types
+// ============================================================================
+
+export interface ProjectResponse {
+  id: string;
+  key: string;
+  name: string;
+}
+
+export interface ListProjectsJsonResponse {
+  projects: ProjectResponse[];
+  summary: {
+    totalProjects: number;
+  };
+}

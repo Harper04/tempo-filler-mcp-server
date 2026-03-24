@@ -34,13 +34,14 @@ try {
 } catch {
   console.error("Warning: get-worklogs UI not found - UI features will be unavailable");
 }
-import { getWorklogs, postWorklog, bulkPostWorklogs, deleteWorklog, getSchedule } from "./tools/index.js";
+import { getWorklogs, postWorklog, bulkPostWorklogs, deleteWorklog, getSchedule, listProjects } from "./tools/index.js";
 import {
   GetWorklogsInputSchema,
   PostWorklogInputSchema,
   BulkPostWorklogsInputSchema,
   DeleteWorklogInputSchema,
   GetScheduleInputSchema,
+  ListProjectsInputSchema,
   TOOL_NAMES,
   ENV_VARS,
   DEFAULTS,
@@ -325,6 +326,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           ui: { resourceUri: "ui://tempofiller/get-schedule.html" },
         } : undefined,
       },
+      {
+        name: TOOL_NAMES.LIST_PROJECTS,
+        description: "List all Jira projects accessible to the authenticated user. Use this to discover project keys before filtering worklogs by projectKey.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: [],
+        },
+      },
     ],
   };
 });
@@ -358,6 +368,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case TOOL_NAMES.GET_SCHEDULE: {
         const input = GetScheduleInputSchema.parse(args);
         return await getSchedule(tempoClient, input, getScheduleUI || undefined);
+      }
+
+      case TOOL_NAMES.LIST_PROJECTS: {
+        const input = ListProjectsInputSchema.parse(args);
+        return await listProjects(tempoClient, input);
       }
 
       default:

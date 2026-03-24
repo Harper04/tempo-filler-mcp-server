@@ -46,6 +46,9 @@ export const DeleteWorklogInputSchema = z.object({
   worklogId: z.string().min(1, "Worklog ID is required"),
 });
 
+// List projects tool input schema
+export const ListProjectsInputSchema = z.object({});
+
 // Get schedule tool input schema
 export const GetScheduleInputSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be in YYYY-MM-DD format"),
@@ -74,6 +77,7 @@ export type PostWorklogInput = z.infer<typeof PostWorklogInputSchema>;
 export type BulkWorklogEntry = z.infer<typeof BulkWorklogEntrySchema>;
 export type BulkPostWorklogsInput = z.infer<typeof BulkPostWorklogsInputSchema>;
 export type DeleteWorklogInput = z.infer<typeof DeleteWorklogInputSchema>;
+export type ListProjectsInput = z.infer<typeof ListProjectsInputSchema>;
 export type GetScheduleInput = z.infer<typeof GetScheduleInputSchema>;
 export type WorklogSummaryArgs = z.infer<typeof WorklogSummaryArgsSchema>;
 export type BulkEntryHelperArgs = z.infer<typeof BulkEntryHelperArgsSchema>;
@@ -91,6 +95,7 @@ export const TOOL_NAMES = {
   BULK_POST_WORKLOGS: "bulk_post_worklogs",
   DELETE_WORKLOG: "delete_worklog",
   GET_SCHEDULE: "get_schedule",
+  LIST_PROJECTS: "list_projects",
 } as const;
 
 // Prompt names as constants
