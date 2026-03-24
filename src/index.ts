@@ -120,7 +120,7 @@ TOOL RELATIONSHIPS:
 const server = new Server(
   {
     name: "tempofiller",
-    version: "2.0.2",
+    version: "3.0.0",
   },
   {
     capabilities: {
