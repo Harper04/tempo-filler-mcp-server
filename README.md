@@ -53,6 +53,28 @@ Check your work schedule with a visual calendar:
 
 ### Install Manually on your favorite AI Assistant
 
+**Atlassian Cloud:**
+
+   ```json
+   {
+     "mcpServers": {
+       "tempo-filler": {
+         "command": "npx",
+         "args": ["@tranzact/tempo-filler-mcp-server"],
+         "env": {
+           "TEMPO_BASE_URL": "https://api.tempo.io",
+           "TEMPO_PAT": "your-tempo-personal-access-token",
+           "JIRA_BASE_URL": "https://your-instance.atlassian.net",
+           "JIRA_EMAIL": "your-email@example.com",
+           "JIRA_API_TOKEN": "your-atlassian-api-token"
+         }
+       }
+     }
+   }
+   ```
+
+**Self-Hosted:**
+
    ```json
    {
      "mcpServers": {
@@ -180,8 +202,8 @@ This project showcases how AI-powered development can dramatically accelerate th
 ### Prerequisites
 
 - **Node.js** (version 18 or higher)
-- A **JIRA instance** with **Tempo Timesheets** plugin installed
-- **Personal Access Token** for your JIRA account
+- **Atlassian Cloud**: A Jira Cloud instance (`*.atlassian.net`) with the Tempo Cloud add-on, plus a Tempo PAT and an Atlassian API token
+- **Self-Hosted**: A Jira server with the Tempo Timesheets plugin installed and a Jira PAT
 
 ### NPX (Recommended)
 
@@ -499,7 +521,7 @@ AI: 📊 Total Hours: 184 hours (23 entries)
 src/
 ├── index.ts              # Main MCP server entry point (stdio transport)
 ├── http-server.ts        # HTTP transport server (development/testing)
-├── tempo-client.ts       # Tempo API client with PAT auth
+├── tempo-client.ts       # Tempo API client (Cloud + Legacy auth)
 ├── tools/                # Tool implementations
 │   ├── get-worklogs.ts
 │   ├── post-worklog.ts
@@ -520,6 +542,11 @@ src/
         ├── index.html
         ├── index.ts
         └── styles.css
+
+test/
+├── get-worklogs.test.ts      # TempoClient.getWorklogs() integration tests
+├── get-worklogs-tool.test.ts # get_worklogs MCP tool handler tests
+└── get-schedule-tool.test.ts # get_schedule MCP tool handler tests
 ```
 
 ### Build Commands
@@ -529,6 +556,7 @@ src/
 - `npm run dev`: Build and run the server (stdio)
 - `npm run dev:http`: Build and run HTTP server (for MCP Apps testing)
 - `npm run typecheck`: Type checking without compilation
+- `npm test`: Run integration tests (requires `.env` with valid credentials)
 
 ## License
 

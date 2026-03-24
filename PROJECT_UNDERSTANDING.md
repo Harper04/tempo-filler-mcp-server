@@ -4,7 +4,7 @@
 
 TempoFiller is a production-ready Model Context Protocol (MCP) server that bridges AI assistants with Tempo (JIRA's time tracking plugin), enabling automated worklog management. Built in TypeScript using modern ES modules, it provides comprehensive tools for retrieving, creating, and managing time entries through AI interfaces like Claude, GitHub Copilot, and other MCP-compatible assistants.
 
-**Current Status**: Published as `@tranzact/tempo-filler-mcp-server` v2.0.0 on NPM registry with full npx support for zero-friction installation, Claude Desktop bundle distribution, and MCP Apps visual UI support.
+**Current Status**: Forked at `https://github.com/Harper04/tempo-filler-mcp-server` (v2.0.2) with full Atlassian Cloud support added on top of the original self-hosted implementation. Published NPM package `@tranzact/tempo-filler-mcp-server` is the upstream reference; this fork distributes `.dxt` bundles via GitHub Releases.
 
 ## Specifications & Documentation
 
@@ -71,7 +71,7 @@ The specification-first approach enabled:
 - **MCP Apps Extension**: `@modelcontextprotocol/ext-apps` v1.0.0
 - **Transport**: stdio (primary), HTTP (development/testing)
 - **Authentication**: Personal Access Token (PAT) with Bearer token authentication
-- **API Integration**: Tempo Timesheets API v4, Tempo Core API v2, and JIRA REST API v3
+- **API Integration**: Tempo Cloud REST API v4, Tempo Timesheets API v4 (self-hosted), Tempo Core API v2 (self-hosted), and JIRA REST API v3 (cloud) / v2 (legacy)
 
 ### Key Dependencies
 
@@ -136,6 +136,11 @@ src/
     │   └── styles.css    # Grid styling
     └── test/             # Test harness for MCP Apps
         └── index.html    # Minimal test component
+
+test/
+├── get-worklogs.test.ts      # TempoClient.getWorklogs() integration tests
+├── get-worklogs-tool.test.ts # get_worklogs MCP tool handler tests
+└── get-schedule-tool.test.ts # get_schedule MCP tool handler tests
 
 scripts/
 └── update-version.js     # Version synchronization script
@@ -227,11 +232,18 @@ bundle/
 
 ### Authentication System
 
-- **PAT-based Authentication**: Uses JIRA Personal Access Tokens for secure API access
-- **Current User Detection**: Automatic resolution of authenticated user identity via `/rest/api/latest/myself`
-- **Token Validation**: Built-in connectivity testing and error handling
-- **Environment Variables**: `TEMPO_BASE_URL` and `TEMPO_PAT` for configuration
-- **User Caching**: Current user identity cached to avoid repeated API calls
+The server operates in two modes determined by whether `JIRA_BASE_URL` is set:
+
+**Atlassian Cloud mode** (`JIRA_BASE_URL` is set):
+- Tempo API calls use `Bearer <TEMPO_PAT>` to `https://api.tempo.io`
+- Jira API calls use `Basic base64(JIRA_EMAIL:JIRA_API_TOKEN)` to the `JIRA_BASE_URL` instance
+- Current user resolved via `GET /rest/api/3/myself` → returns `accountId`
+
+**Self-Hosted (Legacy) mode** (no `JIRA_BASE_URL`):
+- All API calls use `Bearer <TEMPO_PAT>` to the single `TEMPO_BASE_URL`
+- Current user resolved via `GET /rest/api/latest/myself` → returns `key`
+
+Both modes cache the resolved user identity to avoid repeated API calls.
 
 ### API Integration Patterns
 
@@ -323,6 +335,7 @@ AI Assistant → MCP Server → TempoClient → [JIRA API + Tempo API] → Respo
 - `npm run dev`: Development build and run (stdio transport)
 - `npm run dev:http`: Development HTTP server
 - `npm run typecheck`: Type validation without compilation
+- `npm test`: Run integration tests against real API (requires `.env` with credentials)
 - `npm run prepublishOnly`: Pre-publish hook (runs build automatically)
 - `npm run version`: Version synchronization script + git staging
 
@@ -378,21 +391,30 @@ Automated via `scripts/update-version.js`:
 
 ### Environment Variables
 
-- `TEMPO_BASE_URL` (required): JIRA instance URL (e.g., "https://jira.company.com")
-- `TEMPO_PAT` (required): Personal Access Token for authentication
-- `TEMPO_DEFAULT_HOURS` (optional): Default hours per workday (default: 8)
-- `PORT` (optional, HTTP mode only): HTTP server port (default: 3001)
+**Always required:**
+- `TEMPO_BASE_URL`: Tempo API base URL — `https://api.tempo.io` (Cloud) or your Jira instance URL (self-hosted)
+- `TEMPO_PAT`: Tempo Personal Access Token
+
+**Cloud mode only** (set `JIRA_BASE_URL` to enable):
+- `JIRA_BASE_URL`: Atlassian Cloud instance URL (e.g., `https://yourcompany.atlassian.net`)
+- `JIRA_EMAIL`: Your Atlassian account email
+- `JIRA_API_TOKEN`: Atlassian API token from id.atlassian.com
+
+**Optional:**
+- `TEMPO_DEFAULT_HOURS`: Default hours per workday (default: 8)
+- `PORT`: HTTP server port in HTTP transport mode (default: 3001)
 
 ### Prerequisites
 
 - Node.js 18+
-- JIRA instance with Tempo Timesheets plugin
-- Valid Personal Access Token with worklog read/write permissions
+- **Cloud**: Jira Cloud + Tempo Cloud add-on; Tempo PAT + Atlassian API token
+- **Self-Hosted**: Jira server with Tempo Timesheets plugin; Jira PAT with worklog read/write permissions
 
 ## AI Assistant Integration
 
 ### NPX Usage (Recommended)
 
+**Atlassian Cloud:**
 ```json
 {
   "mcpServers": {
@@ -400,33 +422,18 @@ Automated via `scripts/update-version.js`:
       "command": "npx",
       "args": ["@tranzact/tempo-filler-mcp-server"],
       "env": {
-        "TEMPO_BASE_URL": "https://jira.company.com",
-        "TEMPO_PAT": "your-personal-access-token"
+        "TEMPO_BASE_URL": "https://api.tempo.io",
+        "TEMPO_PAT": "your-tempo-pat",
+        "JIRA_BASE_URL": "https://your-instance.atlassian.net",
+        "JIRA_EMAIL": "you@example.com",
+        "JIRA_API_TOKEN": "your-atlassian-api-token"
       }
     }
   }
 }
 ```
 
-### GitHub Copilot Configuration
-
-```json
-{
-  "github.copilot.chat.mcp.servers": {
-    "tempo-filler": {
-      "command": "npx",
-      "args": ["@tranzact/tempo-filler-mcp-server"],
-      "env": {
-        "TEMPO_BASE_URL": "https://jira.company.com",
-        "TEMPO_PAT": "your-personal-access-token"
-      }
-    }
-  }
-}
-```
-
-### Claude Desktop Configuration
-
+**Self-Hosted:**
 ```json
 {
   "mcpServers": {
@@ -446,21 +453,28 @@ Automated via `scripts/update-version.js`:
 
 ### Supported Systems
 
-- **JIRA Core/Software**: 8.14+ (required for PAT authentication)
-- **Tempo Timesheets**: 4.x (uses `/rest/tempo-timesheets/4/` endpoints)
-- **Tempo Core**: 2.x (uses `/rest/tempo-core/2/` for schedule API)
+- **Atlassian Cloud**: Jira Cloud + Tempo Cloud add-on (API at `https://api.tempo.io`)
+- **Self-Hosted JIRA**: 8.14+ with Tempo Timesheets 4.x and Tempo Core 2.x plugins
 - **MCP Protocol**: Full compliance with Model Context Protocol specification
 - **MCP Apps**: Support for visual UI rendering in compatible hosts
 
 ### Key API Endpoints
 
-- `GET /rest/api/latest/myself` - User authentication and identity
-- `GET /rest/api/latest/issue/{key}` - Issue resolution and caching
-- `POST /rest/tempo-timesheets/4/worklogs/` - Worklog creation
-- `POST /rest/tempo-timesheets/4/worklogs/search` - Worklog retrieval
-- `DELETE /rest/tempo-timesheets/4/worklogs/{id}` - Worklog deletion
-- `GET /rest/api/latest/issue/{key}/worklog` - JIRA worklog fallback
-- `POST /rest/tempo-core/2/user/schedule/search` - Work schedule retrieval
+**Atlassian Cloud:**
+- `GET /rest/api/3/myself` (Jira Cloud) — user `accountId` resolution
+- `GET /rest/api/3/issue/{key}` (Jira Cloud) — issue key/summary lookup
+- `GET /4/worklogs` (Tempo Cloud) — worklog retrieval (paginated, up to 1000/page)
+- `POST /4/worklogs` (Tempo Cloud) — worklog creation
+- `DELETE /4/worklogs/{id}` (Tempo Cloud) — worklog deletion
+- `GET /4/user-schedule` (Tempo Cloud) — work schedule retrieval
+
+**Self-Hosted (Legacy):**
+- `GET /rest/api/latest/myself` — user `key` resolution
+- `GET /rest/api/latest/issue/{key}` — issue resolution
+- `POST /rest/tempo-timesheets/4/worklogs/search` — worklog retrieval
+- `POST /rest/tempo-timesheets/4/worklogs/` — worklog creation
+- `DELETE /rest/tempo-timesheets/4/worklogs/{id}` — worklog deletion
+- `POST /rest/tempo-core/2/user/schedule/search` — work schedule retrieval
 
 ## Security Considerations
 
@@ -529,17 +543,19 @@ All tools return structured JSON responses:
 
 ### Production Deployment
 
-- **NPM Publication**: Successfully published as `@tranzact/tempo-filler-mcp-server` v2.0.0
-- **NPX Support**: Zero-friction installation with `npx @tranzact/tempo-filler-mcp-server`
+- **Fork**: Harper04 fork at v2.0.2 with Atlassian Cloud support
+- **Atlassian Cloud Support**: Full Cloud mode with separate Jira + Tempo auth
 - **Cross-Platform**: Verified working on Windows, macOS, and Linux (Node 18/20/22)
 - **Bundle Distribution**: MCP bundle creation integrated into release pipeline
 - **MCP Apps UI**: Visual calendar and timesheet components
+- **Integration Tests**: Node.js built-in test runner with real API coverage
 
 ### Verified Integrations
 
 - **GitHub Copilot Chat (VS Code)**: Full integration with npx configuration
 - **Claude Desktop**: Complete MCP server support with bundle installation
-- **Real Tempo API**: Successfully tested against production Tempo Timesheets API v4
+- **Atlassian Cloud**: Successfully tested against Tempo Cloud API v4 and Jira Cloud REST API v3
+- **Self-Hosted Tempo API**: Successfully tested against production Tempo Timesheets API v4
 
 ### Core Features Implementation Status
 
@@ -601,13 +617,13 @@ Potential areas for enhancement (not currently prioritized):
 - Enhanced caching strategies for improved performance
 - Support for custom Tempo attributes and fields
 - Integration with additional time tracking systems
-- Comprehensive test suite (unit + integration)
+- Expanded test coverage (unit tests, write-operation tests)
 - Performance monitoring and analytics
 
 ## Maintenance Status
 
 The project is **actively maintained** with:
-- Current version: v2.0.0
+- Current version: v2.0.2
 - Published on NPM registry with provenance
 - Available via GitHub releases
 - Fully documented and specified
